@@ -8,7 +8,7 @@ from datetime import datetime
 import requests
 from bs4 import BeautifulSoup
 
-from quasarr.providers.log import info
+from quasarr.providers.log import info, debug
 from quasarr.search.sources.sf import parse_mirrors
 
 
@@ -97,7 +97,7 @@ def get_sf_download_links(shared_state, url, mirror, title):
                     else:
                         release_url = next(iter(mirrors["season"]))
 
-                    real_url = resolve_sf_redirect(release_url)
+                    real_url = resolve_sf_redirect(release_url, shared_state.values["user_agent"])
                     return real_url
             except:
                 continue
@@ -107,10 +107,16 @@ def get_sf_download_links(shared_state, url, mirror, title):
     return None
 
 
-def resolve_sf_redirect(url):
+def resolve_sf_redirect(url, user_agent):
     try:
-        response = requests.get(url, allow_redirects=True, timeout=10)
-        return response.url
+        response = requests.get(url, allow_redirects=True, timeout=10,
+                                headers={'User-Agent': user_agent})
+        if response.history:
+            for resp in response.history:
+                debug(f"Redirected from {resp.url} to {response.url}")
+            return response.url
+        else:
+            info(f"SF blocked attempt to resolve {url}. Your IP may be banned. Try again later.")
     except Exception as e:
         info(f"Error fetching redirected URL for {url}: {e}")
-        return None
+    return None

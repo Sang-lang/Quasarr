@@ -359,14 +359,16 @@ def download(shared_state, request_from, title, url, mirror, size_mb, password, 
 
     elif sf and sf.lower() in url.lower():
         if url.startswith(f"https://{sf}/external"):  # from interactive search
-            url = resolve_sf_redirect(url)
+            url = resolve_sf_redirect(url, shared_state.values["user_agent"])
         elif url.startswith(f"https://{sf}/"):  # from feed search
             url = get_sf_download_links(shared_state, url, mirror, title)
 
         if url:
             info(f'CAPTCHA-Solution required for "{title}" at: "{shared_state.values['external_address']}/captcha"')
             send_discord_message(shared_state, title=title, case="captcha", imdb_id=imdb_id)
-            blob = json.dumps({"title": title, "links": [[url, "filecrypt"]], "size_mb": size_mb, "password": password})
+            blob = json.dumps(
+                {"title": title, "links": [[url, "filecrypt"]], "size_mb": size_mb, "password": password,
+                 "mirror": mirror})
             shared_state.values["database"]("protected").update_store(package_id, blob)
         else:
             info(f"Failed to get download link from SF for {title} - {url}")
@@ -375,7 +377,8 @@ def download(shared_state, request_from, title, url, mirror, size_mb, password, 
     elif "filecrypt".lower() in url.lower():
         info(f'CAPTCHA-Solution required for "{title}" at: "{shared_state.values['external_address']}/captcha"')
         send_discord_message(shared_state, title=title, case="captcha", imdb_id=imdb_id)
-        blob = json.dumps({"title": title, "links": [[url, "filecrypt"]], "size_mb": size_mb, "password": password})
+        blob = json.dumps(
+            {"title": title, "links": [[url, "filecrypt"]], "size_mb": size_mb, "password": password, "mirror": mirror})
         shared_state.values["database"]("protected").update_store(package_id, blob)
 
     else:

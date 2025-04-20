@@ -293,7 +293,7 @@ def sf_search(shared_state, start_time, request_from, search_string, mirror=None
                             if not source:
                                 info(f"Could not find mirror '{mirror}' for '{title}'")
                         else:
-                            source = next(iter(mirrors["season"]))
+                            source = next(iter(mirrors["season"].values()))
                     except:
                         debug(f"Could not find link for '{search_string}'")
                         continue

@@ -100,7 +100,7 @@ def run():
         supported_hostnames = extract_allowed_keys(Config._DEFAULT_CONFIG, 'Hostnames')
         shared_state.update("sites", [key.upper() for key in supported_hostnames])
         shared_state.update("user_agent",
-                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36")
+                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36")
         shared_state.update("helper_active", False)
 
         print(f'Config path: "{config_path}"')
@@ -197,6 +197,8 @@ def run():
         print(f'Quasarr API now running at: "{shared_state.values['external_address']}"')
         print('Use the above URL to set up a "Newznab Indexer" and "SABnzbd Download Client" in Radarr/Sonarr')
         print(f'Leave all settings at default and use this API key: "{api_key}" (without quotes)')
+        print('Optionally set one desired mirror in "API Path" at the advanced indexer settings, e.g. "/api/dropbox/"')
+        print('For more details, check README.md on GitHub...')
 
         print("\n===== Quasarr Info Log =====")
         if os.getenv('DEBUG'):

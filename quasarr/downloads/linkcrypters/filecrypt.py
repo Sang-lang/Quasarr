@@ -67,7 +67,6 @@ class CNL:
 
 class DLC:
     def __init__(self, shared_state, dlc_file):
-        global user_agent
         self.shared_state = shared_state
         self.data = dlc_file
         self.KEY = b"cb99b5cbc24db398"
@@ -131,7 +130,7 @@ class DLC:
         return all_urls
 
 
-def get_filecrypt_links(shared_state, token, title, url, password=None):
+def get_filecrypt_links(shared_state, token, title, url, password=None, mirror=None):
     info("Attempting to decrypt Filecrypt link: " + url)
     session = requests.Session()
 
@@ -238,7 +237,7 @@ def get_filecrypt_links(shared_state, token, title, url, password=None):
 
         mirrors = []
         mirrors_available = soup.select("a[href*=mirror]")
-        if mirrors_available:
+        if not mirror and mirrors_available:
             for mirror in mirrors_available:
                 try:
                     mirror_query = mirror.get("href").split("?")[1]
