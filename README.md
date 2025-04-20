@@ -33,6 +33,10 @@ Quasarr will confidently handle the rest.
 * Set up Quasarr as `Newznab Indexer` and `SABnzbd Download Client` in Radarr/Sonarr
     * Use the API key from console output (or copy it from the Quasarr web UI)
     * Leave all other settings at default.
+    * If you prefer to only get releases for a specific mirror, add the mirror name to the
+      API path in the advanced indexer settings.
+      * Example: `/api/dropbox/` results will only return releases where `dropbox` is explicitly mentioned in link.
+      * This means that if a mirror is not available at a hostname, the release will be ignored.
 * To see download status information
     * Open `Activity` → `Queue` → `Options` in Radarr/Sonarr
     * Enable `Release Title`
@@ -94,10 +98,12 @@ amount of flexibility.
 I will not waste my precious time on features that will slow future development cycles down.
 Issues, feature and pull requests that are meant to introduce feature toggles will therefore be rejected.
 
-* If you need to update hostnames or My-JDownloader-Credentials, simply delete the config and restart Quasarr.
-* Radarr/Sonarr provide custom formats to automatically chose the most fitting release for a given search.
-* Quasarr will always prefix release titles with the source hostname in square brackets in case you want to apply
-  custom format scores to certain hostnames.
+## Intentional design decisions
+* There is no settings UI after the initial setup.
+  If you need to update hostnames or My-JDownloader-Credentials, simply delete the `Quasarr.ini` and restart Quasarr.
+* Radarr and Sonarr provide custom formats to automatically choose the most fitting release for a given search
+  based on the release's title. Quasarr prefixes release titles with the source hostname in square brackets in case you
+  want to apply custom format scores to certain hostnames.
 
 # Roadmap
 
@@ -108,7 +114,6 @@ Issues, feature and pull requests that are meant to introduce feature toggles wi
     - Existing settings in Radarr/Sonarr
     - Existing settings in JDownloader
     - Existing tools from the *arr ecosystem that integrate directly with Radarr/Sonarr
-- Exposing the mirrors of a release to Radarr/Sonarr is a desired feature. This will allow scoring desired mirrors using custom profiles in Radarr/Sonarr. Quasarr will always provide all found mirrors at once, if they are protected by the same or no CAPTCHA.
 - There are no hostname integrations in active development.
 - Adding one or more hostnames focused on English content is highly desired.
   - Please provide suggestions in a private thread on Discord.
@@ -117,3 +122,24 @@ Issues, feature and pull requests that are meant to introduce feature toggles wi
     - Please follow the existing code style and project structure.
     - Anti-bot measures must be circumvented without relying on third party tools like Flaresolverr.
     - Please provide proof of functionality (screenshots/examples) when submitting your pull request.
+
+## Development Setup for Pull Requests
+
+To test your changes before submitting a pull request:
+
+### 1. Run Quasarr with the `--internal_address` parameter
+
+```bash
+python Quasarr.py --internal_address=http://<host-ip>:<port>
+```
+
+Replace `<host-ip>` and `<port>` with the scheme, IP, and port of your host machine.
+The `--internal_address` parameter is **mandatory**.
+
+### 2. Start the required services using the `dev-services-compose.yml` file
+
+```bash
+CONFIG_VOLUMES=/path/to/config docker-compose -f docker/dev-services-compose.yml up
+```
+
+Replace `/path/to/config` with your desired configuration location. The `CONFIG_VOLUMES` environment variable is **mandatory**.
