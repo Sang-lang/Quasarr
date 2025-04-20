@@ -25,6 +25,7 @@ def setup_sponsors_helper_routes(app):
                 data = json.loads(package[1])
                 title = data["title"]
                 links = data["links"]
+                mirror = None if (mirror := data.get('mirror')) == "None" else mirror
                 password = data["password"]
 
             return {
@@ -32,6 +33,7 @@ def setup_sponsors_helper_routes(app):
                     "name": title,
                     "id": package_id,
                     "url": links,
+                    "mirror": mirror,
                     "password": password,
                     "max_attempts": 3
                 }
