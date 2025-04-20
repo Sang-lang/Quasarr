@@ -36,7 +36,7 @@ Quasarr will confidently handle the rest.
     * If you prefer to only get releases for a specific mirror, add the mirror name to the
       API path in the advanced indexer settings.
       * Example: `/api/dropbox/` results will only return releases where `dropbox` is explicitly mentioned in link.
-      * This means that if a mirror is not available at a hostname, the release will be ignored.
+      * This means that if a mirror is not available at a hostname, the release is ignored or the download will fail.
 * To see download status information
     * Open `Activity` → `Queue` → `Options` in Radarr/Sonarr
     * Enable `Release Title`

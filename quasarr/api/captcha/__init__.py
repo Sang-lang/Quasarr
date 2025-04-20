@@ -40,6 +40,7 @@ def setup_captcha_routes(app):
             title = data["title"]
             links = data["links"]
             password = data["password"]
+            desired_mirror = data["mirror"]
 
         link_options = ""
         if len(links) > 1:
@@ -85,7 +86,8 @@ def setup_captcha_routes(app):
                             ''' + f'''package_id: '{package_id}',
                             title: '{title}',
                             link: link,
-                            password: '{password}'
+                            password: '{password}',
+                            mirror: '{desired_mirror}',
                         ''' + '''})
                     })
                     .then(response => response.json())
@@ -191,10 +193,12 @@ def setup_captcha_routes(app):
             title = data.get('title')
             link = data.get('link')
             password = data.get('password')
+            mirror = None if (mirror := data.get('mirror')) == "None" else mirror
+
             if token:
                 info(f"Received token: {token}")
                 info(f"Decrypting links for {title}")
-                download_links = get_filecrypt_links(shared_state, token, title, link, password)
+                download_links = get_filecrypt_links(shared_state, token, title, link, password=password, mirror=mirror)
 
                 info(f"Decrypted {len(download_links)} download links for {title}")
 
