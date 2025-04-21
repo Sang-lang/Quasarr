@@ -26,6 +26,7 @@ def setup_sponsors_helper_routes(app):
                 title = data["title"]
                 links = data["links"]
                 password = data["password"]
+                mirror = None if (mirror := data.get('mirror')) == "None" else mirror
 
             return {
                 "to_decrypt": {
@@ -33,6 +34,7 @@ def setup_sponsors_helper_routes(app):
                     "id": package_id,
                     "url": links,
                     "password": password,
+                    "mirror": mirror,
                     "max_attempts": 3
                 }
             }
