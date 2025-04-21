@@ -56,7 +56,7 @@ def dt_feed(shared_state, start_time, request_from, mirror=None):
 
                 source = link_tag['href']
                 title_raw = link_tag.text.strip()
-                title = title_raw.replace(' - ', '-').replace(' ', '.')
+                title = title_raw.replace(' - ', '-').replace(' ', '.').replace('(', '').replace(')', '')
 
                 try:
                     imdb_id = re.search(r'tt\d+', str(article)).group()
@@ -164,7 +164,7 @@ def dt_search(shared_state, start_time, request_from, search_string, mirror=None
                     continue
                 source = link_tag["href"]
                 title_raw = link_tag.text.strip()
-                title = title_raw.replace(' - ', '-').replace(' ', '.')
+                title = title_raw.replace(' - ', '-').replace(' ', '.').replace('(', '').replace(')', '')
 
                 try:
                     imdb_id = re.search(r"tt\d+", str(article)).group()

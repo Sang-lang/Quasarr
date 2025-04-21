@@ -3,6 +3,8 @@
 # Project by https://github.com/rix1337
 
 import json
+from collections import defaultdict
+from urllib.parse import urlparse
 
 from quasarr.downloads.sources.dd import get_dd_download_links
 from quasarr.downloads.sources.dt import get_dt_download_links
@@ -36,7 +38,22 @@ def get_links_status(package, all_links):
     eta = None
     error = None
 
+    mirrors = defaultdict(list)
     for link in links_in_package:
+        url = link.get("url", "")
+        base_domain = urlparse(url).netloc
+        mirrors[base_domain].append(link)
+
+    has_mirror_all_online = False
+    for mirror_links in mirrors.values():
+        if all(link.get('availability', '').lower() == 'online' for link in mirror_links):
+            has_mirror_all_online = True
+            break
+
+    for link in links_in_package:
+        availability = link.get('availability', "")
+        if availability.lower() == "offline" and not has_mirror_all_online:
+            error = "Links offline for all mirrors"
         link_finished = link.get('finished', False)
         link_extraction_status = link.get('extractionStatus', '').lower()  # "error" signifies an issue
         link_eta = link.get('eta', 0) // 1000
@@ -95,20 +112,47 @@ def get_packages(shared_state):
                 "type": "protected",
                 "package_id": package_id
             })
+
+    failed_packages = shared_state.get_db("failed").retrieve_all_titles()
+    if failed_packages:
+        for package in failed_packages:
+            package_id = package[0]
+
+            data = json.loads(package[1])
+            details = {
+                "name": data["title"],
+                "bytesLoaded": 0,
+                "saveTo": "/"
+            }
+
+            packages.append({
+                "details": details,
+                "location": "history",
+                "type": "failed",
+                "error": "Too many failed attempts by SponsorsHelper",
+                "comment": package_id,
+                "uuid": package_id
+            })
     try:
         linkgrabber_packages = shared_state.get_device().linkgrabber.query_packages()
+        linkgrabber_links = shared_state.get_device().linkgrabber.query_links()
     except (TokenExpiredException, RequestTimeoutException, MYJDException):
         linkgrabber_packages = []
+        linkgrabber_links = []
 
     if linkgrabber_packages:
         for package in linkgrabber_packages:
             comment = get_links_comment(package, shared_state.get_device().linkgrabber.query_links())
+            link_details = get_links_status(package, linkgrabber_links)
+            error = link_details["error"]
+            location = "history" if error else "queue"
             packages.append({
                 "details": package,
-                "location": "queue",
+                "location": location,
                 "type": "linkgrabber",
                 "comment": comment,
-                "uuid": package.get("uuid")
+                "uuid": package.get("uuid"),
+                "error": error
             })
     try:
         downloader_packages = shared_state.get_device().downloads.query_packages()
@@ -120,12 +164,12 @@ def get_packages(shared_state):
     if downloader_packages and downloader_links:
         for package in downloader_packages:
             comment = get_links_comment(package, downloader_links)
-            all_finished = get_links_status(package, downloader_links)
+            link_details = get_links_status(package, downloader_links)
 
-            error = all_finished["error"]
-            finished = all_finished["all_finished"]
-            if not finished and all_finished["eta"]:
-                package["eta"] = all_finished["eta"]
+            error = link_details["error"]
+            finished = link_details["all_finished"]
+            if not finished and link_details["eta"]:
+                package["eta"] = link_details["eta"]
 
             location = "history" if error or finished else "queue"
 
@@ -234,7 +278,10 @@ def get_packages(shared_state):
         elif package["location"] == "history":
             details = package["details"]
             name = details["name"]
-            size = int(details["bytesLoaded"])
+            try:
+                size = int(details["bytesLoaded"])
+            except KeyError:
+                size = 0
             storage = details["saveTo"]
             try:
                 package_id = package["comment"]
@@ -262,7 +309,7 @@ def get_packages(shared_state):
                 "name": name,
                 "bytes": int(size),
                 "type": "downloader",
-                "uuid": package["uuid"]
+                "uuid": ""
             })
             history_index += 1
         else:
@@ -278,20 +325,28 @@ def delete_package(shared_state, package_id):
     for package_location in packages:
         for package in packages[package_location]:
             if package["nzo_id"] == package_id:
-                if package["type"] == "linkgrabber":
-                    ids = get_links_matching_package_uuid(package, shared_state.get_device().linkgrabber.query_links())
-                    shared_state.get_device().linkgrabber.remove_links(ids, [package["uuid"]])
-                elif package["type"] == "downloader":
-                    ids = get_links_matching_package_uuid(package, shared_state.get_device().downloads.query_links())
-                    shared_state.get_device().downloads.cleanup(
-                        "DELETE_ALL",
-                        "REMOVE_LINKS_AND_DELETE_FILES",
-                        "SELECTED",
-                        ids,
-                        [package["uuid"]]
-                    )
-                else:
-                    shared_state.get_db("protected").delete(package_id)
+                # Always delete from all locations to cover potential edge cases (e.g. package was just moved)
+                ids = get_links_matching_package_uuid(package, shared_state.get_device().linkgrabber.query_links())
+                shared_state.get_device().linkgrabber.cleanup(
+                    "DELETE_ALL",
+                    "REMOVE_LINKS_AND_DELETE_FILES",
+                    "SELECTED",
+                    ids,
+                    [package["uuid"]]
+                )
+
+                ids = get_links_matching_package_uuid(package, shared_state.get_device().downloads.query_links())
+                shared_state.get_device().downloads.cleanup(
+                    "DELETE_ALL",
+                    "REMOVE_LINKS_AND_DELETE_FILES",
+                    "SELECTED",
+                    ids,
+                    [package["uuid"]]
+                )
+
+                shared_state.get_db("failed").delete(package_id)
+                shared_state.get_db("protected").delete(package_id)
+
                 if package_location == "queue":
                     package_name_field = "filename"
                 else:

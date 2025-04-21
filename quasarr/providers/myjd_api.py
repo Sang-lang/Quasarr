@@ -112,6 +112,13 @@ class Config:
         self.device = device
         self.url = '/config'
 
+    def list(self):
+        """
+        :return:  List<AdvancedConfigAPIEntry>
+        """
+        resp = self.device.action(self.url + "/list")
+        return resp
+
     def get(self, interface_name, storage, key):
         """
         :param interfaceName: a valid interface name from List<AdvancedConfigAPIEntry>
@@ -177,7 +184,7 @@ class Linkgrabber:
         self.url = '/linkgrabberv2'
 
     def is_collecting(self):
-        resp = self.device.action("/linkgrabberv2/isCollecting")
+        resp = self.device.action(self.url + "/isCollecting")
         return resp
 
     def add_links(self,
@@ -204,7 +211,33 @@ class Linkgrabber:
         "destinationFolder" : null
         }
         """
-        resp = self.device.action("/linkgrabberv2/addLinks", params)
+        resp = self.device.action(self.url + "/addLinks", params)
+        return resp
+
+    def cleanup(self,
+                action,
+                mode,
+                selection_type,
+                link_ids=[],
+                package_ids=[]):
+        """
+        Clean packages and/or links of the linkgrabber list.
+        Requires at least a package_ids or link_ids list, or both.
+
+        :param package_ids: Package UUID's.
+        :type: list of strings.
+        :param link_ids: link UUID's.
+        :type: list of strings
+        :param action: Action to be done. Actions: DELETE_ALL, DELETE_DISABLED, DELETE_FAILED, DELETE_FINISHED, DELETE_OFFLINE, DELETE_DUPE, DELETE_MODE
+        :type: str:
+        :param mode: Mode to use. Modes: REMOVE_LINKS_AND_DELETE_FILES, REMOVE_LINKS_AND_RECYCLE_FILES, REMOVE_LINKS_ONLY
+        :type: str:
+        :param selection_type: Type of selection to use. Types: SELECTED, UNSELECTED, ALL, NONE
+        :type: str:
+        """
+        params = [link_ids, package_ids]
+        params += [action, mode, selection_type]
+        resp = self.device.action(self.url + "/cleanup", params)
         return resp
 
     def remove_links(self, links_ids, packages_ids):

@@ -6,7 +6,6 @@ import json
 
 from bottle import request, abort
 
-from quasarr.downloads import delete_package
 from quasarr.providers import shared_state
 from quasarr.providers.log import info
 from quasarr.providers.notifications import send_discord_message
@@ -69,18 +68,25 @@ def setup_sponsors_helper_routes(app):
 
         return abort(500, "Failed")
 
+    @app.delete("/sponsors_helper/api/to_failed/")
     @app.delete("/sponsors_helper/api/to_delete/")
-    def to_delete_api():
+    def move_to_failed_api():
         try:
             data = request.json
             package_id = data.get('package_id')
-            deleted = delete_package(shared_state, package_id)
-            if deleted:
-                send_discord_message(shared_state, title=deleted, case="deleted")
-                return f'Deleted package "{deleted}" with ID "{package_id}"'
+
+            data = json.loads(shared_state.get_db("protected").retrieve(package_id))
+            title = data.get('title')
+            moved = shared_state.get_db("failed").store(package_id, json.dumps(data))
+            if moved and title:
+                deleted = shared_state.get_db("protected").delete(package_id)
+                if deleted:
+                    send_discord_message(shared_state, title=title, case="failed")
+                    info(f"Package {title} with ID {package_id} marked as failed!")
+                    return f'Package "{title}" with ID "{package_id} marked as failed!"'
 
         except Exception as e:
-            info(f"Error deleting: {e}")
+            info(f"Error marking package as failed: {e}")
 
         return abort(500, "Failed")
 
