@@ -130,7 +130,7 @@ def get_clean_hostnames(shared_state):
         if strg and '/' in strg:
             strg = strg.replace('https://', '').replace('http://', '')
             strg = re.findall(r'([a-z-.]*\.[a-z]*)', strg)[0]
-            hostnames.save(host, string)
+            hostnames.save(host, strg)
         if strg and re.match(r'.*[A-Z].*', strg):
             hostnames.save(host, strg.lower())
         if strg:

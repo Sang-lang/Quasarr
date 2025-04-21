@@ -15,6 +15,18 @@ hostname = "fx"
 supported_mirrors = ["rapidgator"]
 
 
+def sanitize_title(title):
+    umlaut_map = {
+        "Ä": "Ae", "ä": "ae",
+        "Ö": "Oe", "ö": "oe",
+        "Ü": "Ue", "ü": "ue",
+        "ß": "ss"
+    }
+    for umlaut, replacement in umlaut_map.items():
+        title = title.replace(umlaut, replacement)
+    return title.encode("ascii", errors="ignore").decode().replace("/", "").replace(" ", ".").strip()
+
+
 def extract_size(text):
     match = re.match(r"(\d+)\s*([A-Za-z]+)", text)
     if match:
@@ -61,8 +73,7 @@ def fx_feed(shared_state, start_time, mirror=None):
                 i = 0
                 for title in titles:
                     link = title["href"]
-                    title = (title.text.encode("ascii", errors="ignore").decode().
-                             replace("/", "").replace(" ", ".").strip())
+                    title = sanitize_title(title.text)
 
                     try:
                         imdb_link = article.find("a", href=re.compile(r"imdb\.com"))
@@ -160,8 +171,7 @@ def fx_search(shared_state, start_time, search_string, mirror=None):
                     i = 0
                     for title in titles:
                         link = title["href"]
-                        title = (title.text.encode("ascii", errors="ignore").decode().
-                                 replace("/", "").replace(" ", ".").strip())
+                        title = sanitize_title(title.text)
 
                         if not imdb_id and not shared_state.search_string_in_sanitized_title(search_string, title):
                             continue
