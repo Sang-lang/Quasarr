@@ -53,7 +53,7 @@ def get_links_status(package, all_links):
     for link in links_in_package:
         availability = link.get('availability', "")
         if availability.lower() == "offline" and not has_mirror_all_online:
-            error = "One or more links are offline"
+            error = "Links offline for all mirrors"
         link_finished = link.get('finished', False)
         link_extraction_status = link.get('extractionStatus', '').lower()  # "error" signifies an issue
         link_eta = link.get('eta', 0) // 1000
@@ -111,6 +111,27 @@ def get_packages(shared_state):
                 "location": "queue",
                 "type": "protected",
                 "package_id": package_id
+            })
+
+    failed_packages = shared_state.get_db("failed").retrieve_all_titles()
+    if failed_packages:
+        for package in failed_packages:
+            package_id = package[0]
+
+            data = json.loads(package[1])
+            details = {
+                "name": data["title"],
+                "bytesLoaded": 0,
+                "saveTo": "/"
+            }
+
+            packages.append({
+                "details": details,
+                "location": "history",
+                "type": "failed",
+                "error": "Too many failed attempts by SponsorsHelper",
+                "comment": package_id,
+                "uuid": package_id
             })
     try:
         linkgrabber_packages = shared_state.get_device().linkgrabber.query_packages()
@@ -288,7 +309,7 @@ def get_packages(shared_state):
                 "name": name,
                 "bytes": int(size),
                 "type": "downloader",
-                "uuid": package["uuid"]
+                "uuid": ""
             })
             history_index += 1
         else:
@@ -304,7 +325,7 @@ def delete_package(shared_state, package_id):
     for package_location in packages:
         for package in packages[package_location]:
             if package["nzo_id"] == package_id:
-                # we delete from all three locations on purpose in case the package has just been moved
+                # Always delete from all locations to cover potential edge cases (e.g. package was just moved)
                 ids = get_links_matching_package_uuid(package, shared_state.get_device().linkgrabber.query_links())
                 shared_state.get_device().linkgrabber.cleanup(
                     "DELETE_ALL",
@@ -313,6 +334,7 @@ def delete_package(shared_state, package_id):
                     ids,
                     [package["uuid"]]
                 )
+
                 ids = get_links_matching_package_uuid(package, shared_state.get_device().downloads.query_links())
                 shared_state.get_device().downloads.cleanup(
                     "DELETE_ALL",
@@ -321,6 +343,8 @@ def delete_package(shared_state, package_id):
                     ids,
                     [package["uuid"]]
                 )
+
+                shared_state.get_db("failed").delete(package_id)
                 shared_state.get_db("protected").delete(package_id)
 
                 if package_location == "queue":

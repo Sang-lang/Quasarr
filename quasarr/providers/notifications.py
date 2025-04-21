@@ -25,7 +25,7 @@ def send_discord_message(shared_state, title, case, imdb_id=None):
 
     :param shared_state: Shared state object containing configuration.
     :param title: Title of the embed to be sent.
-    :param case: A string representing the scenario (e.g., 'captcha', 'captcha_solved', 'package_deleted').
+    :param case: A string representing the scenario (e.g., 'captcha', 'failed', 'unprotected').
     :param imdb_id: A string starting with "tt" followed by at least 7 digits, representing an object on IMDb
     :return: True if the message was sent successfully, False otherwise.
     """
@@ -50,8 +50,8 @@ def send_discord_message(shared_state, title, case, imdb_id=None):
     elif case == "solved":
         description = 'CAPTCHA solved by SponsorsHelper!'
         fields = None
-    elif case == "deleted":
-        description = 'SponsorsHelper failed to solve the CAPTCHA! Package deleted.'
+    elif case == "failed":
+        description = 'SponsorsHelper failed to solve the CAPTCHA! Package marked es failed.'
         fields = None
     elif case == "captcha":
         description = 'Download will proceed, once the CAPTCHA has been solved.'
@@ -87,7 +87,7 @@ def send_discord_message(shared_state, title, case, imdb_id=None):
         data['embeds'][0]['image'] = poster_object
 
     # Apply silent mode: suppress notifications for all cases except 'deleted'
-    if silent and case != "deleted":
+    if silent and case != "failed":
         data['flags'] = SUPPRESS_NOTIFICATIONS
 
     response = requests.post(shared_state.values["discord"], data=json.dumps(data),

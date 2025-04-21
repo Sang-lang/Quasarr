@@ -55,6 +55,7 @@ class DataBase(object):
         # using this parameterized query to prevent SQL injection, which requires a tuple as second argument
         self._conn.execute(query, (key, value))
         self._conn.commit()
+        return True
 
     def update_store(self, key, value):
         delete_query = f"DELETE FROM {self._table} WHERE key=?"
@@ -64,13 +65,16 @@ class DataBase(object):
         # using this parameterized query to prevent SQL injection, which requires a tuple as second argument
         self._conn.execute(insert_query, (key, value))
         self._conn.commit()
+        return True
 
     def delete(self, key):
         query = f"DELETE FROM {self._table} WHERE key=?"
         # using this parameterized query to prevent SQL injection, which requires a tuple as second argument
         self._conn.execute(query, (key,))
         self._conn.commit()
+        return True
 
     def reset(self):
         self._conn.execute(f"DROP TABLE IF EXISTS {self._table}")
         self._conn.commit()
+        return True
