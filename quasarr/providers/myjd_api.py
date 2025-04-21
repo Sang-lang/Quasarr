@@ -112,6 +112,13 @@ class Config:
         self.device = device
         self.url = '/config'
 
+    def list(self):
+        """
+        :return:  List<AdvancedConfigAPIEntry>
+        """
+        resp = self.device.action(self.url + "/list")
+        return resp
+
     def get(self, interface_name, storage, key):
         """
         :param interfaceName: a valid interface name from List<AdvancedConfigAPIEntry>

@@ -240,6 +240,12 @@ def set_device_settings():
             "setting": "DeleteArchiveDownloadlinksAfterExtraction",
             "expected_value": False,  # Links must be kept after extraction for Quasarr to work
         },
+        {
+            "namespace": "org.jdownloader.gui.views.linkgrabber.addlinksdialog.LinkgrabberSettings",
+            "storage": None,
+            "setting": "HandleOfflineOnConfirmLatestSelection",
+            "expected_value": "EXCLUDE_OFFLINE_AND_REMOVE",  # Prevents popup starting download with offline mirrors
+        }
     ]
 
     for setting in settings_to_enforce:

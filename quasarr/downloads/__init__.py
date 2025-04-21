@@ -3,6 +3,8 @@
 # Project by https://github.com/rix1337
 
 import json
+from collections import defaultdict
+from urllib.parse import urlparse
 
 from quasarr.downloads.sources.dd import get_dd_download_links
 from quasarr.downloads.sources.dt import get_dt_download_links
@@ -36,9 +38,21 @@ def get_links_status(package, all_links):
     eta = None
     error = None
 
+    mirrors = defaultdict(list)
+    for link in links_in_package:
+        url = link.get("url", "")
+        base_domain = urlparse(url).netloc
+        mirrors[base_domain].append(link)
+
+    has_mirror_all_online = False
+    for mirror_links in mirrors.values():
+        if all(link.get('availability', '').lower() == 'online' for link in mirror_links):
+            has_mirror_all_online = True
+            break
+
     for link in links_in_package:
         availability = link.get('availability', "")
-        if availability.lower() == "offline":
+        if availability.lower() == "offline" and not has_mirror_all_online:
             error = "One or more links are offline"
         link_finished = link.get('finished', False)
         link_extraction_status = link.get('extractionStatus', '').lower()  # "error" signifies an issue
