@@ -3,12 +3,20 @@
 # Project by https://github.com/rix1337
 
 import json
+import os
 
 import requests
 
 from quasarr.providers.imdb_metadata import get_imdb_id_from_title
 from quasarr.providers.imdb_metadata import get_poster_link
 from quasarr.providers.log import info
+
+# Discord message flag for suppressing notifications
+SUPPRESS_NOTIFICATIONS = 1 << 12  # 4096
+
+silent = False
+if os.getenv('SILENT'):
+    silent = True
 
 
 def send_discord_message(shared_state, title, case, imdb_id=None):
@@ -77,6 +85,10 @@ def send_discord_message(shared_state, title, case, imdb_id=None):
     if poster_object:
         data['embeds'][0]['thumbnail'] = poster_object
         data['embeds'][0]['image'] = poster_object
+
+    # Apply silent mode: suppress notifications for all cases except 'deleted'
+    if silent and case != "deleted":
+        data['flags'] = SUPPRESS_NOTIFICATIONS
 
     response = requests.post(shared_state.values["discord"], data=json.dumps(data),
                              headers={"Content-Type": "application/json"})
