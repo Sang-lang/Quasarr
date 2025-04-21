@@ -281,25 +281,6 @@ def set_device_settings():
             "storage": "null",
             "setting": "FilterList",
             "expected_values": [
-                {
-                    'conditionFilter':
-                        {'conditions': [], 'enabled': False, 'matchType': 'IS_TRUE'},
-                    'created': 0,
-                    'enabled': True,
-                    'filenameFilter': {'enabled': False, 'matchType': 'CONTAINS', 'regex': '', 'useRegex': False},
-                    'filesizeFilter': {'enabled': False, 'from': 0, 'matchType': 'BETWEEN', 'to': 0},
-                    'filetypeFilter': {'archivesEnabled': False, 'audioFilesEnabled': False, 'customs': None,
-                                       'docFilesEnabled': False, 'enabled': False, 'exeFilesEnabled': False,
-                                       'hashEnabled': False, 'imagesEnabled': False, 'matchType': 'IS',
-                                       'subFilesEnabled': False, 'useRegex': False, 'videoFilesEnabled': False},
-                    'hosterURLFilter': {'enabled': False, 'matchType': 'CONTAINS', 'regex': '', 'useRegex': False},
-                    'matchAlwaysFilter': {'enabled': False}, 'name': 'Quasarr_Block_Offline',
-                    'onlineStatusFilter': {'enabled': True, 'matchType': 'IS', 'onlineStatus': 'OFFLINE'},
-                    'originFilter': {'enabled': False, 'matchType': 'IS', 'origins': []},
-                    'packagenameFilter': {'enabled': False, 'matchType': 'CONTAINS', 'regex': '', 'useRegex': False},
-                    'pluginStatusFilter': {'enabled': False, 'matchType': 'IS', 'pluginStatus': 'PREMIUM'},
-                    'sourceURLFilter': {'enabled': False, 'matchType': 'CONTAINS', 'regex': '', 'useRegex': False},
-                    'testUrl': ''},
                 {'conditionFilter':
                      {'conditions': [], 'enabled': False, 'matchType': 'IS_TRUE'}, 'created': 0,
                  'enabled': True,
