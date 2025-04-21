@@ -40,7 +40,10 @@ def setup_captcha_routes(app):
             title = data["title"]
             links = data["links"]
             password = data["password"]
-            desired_mirror = data["mirror"]
+            try:
+                desired_mirror = data["mirror"]
+            except KeyError:
+                desired_mirror = None
 
         link_options = ""
         if len(links) > 1:
