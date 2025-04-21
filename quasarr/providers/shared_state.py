@@ -270,6 +270,9 @@ def set_device_settings():
                 '.*\\.sub',
                 '.*\\.srt',
                 '.*\\.nfo',
+                '.*\\.bat',
+                '.*\\.txt',
+                '.*\\.exe',
                 '.*\\.sfv'
             ]
         },
@@ -300,15 +303,19 @@ def set_device_settings():
                 {'conditionFilter':
                      {'conditions': [], 'enabled': False, 'matchType': 'IS_TRUE'}, 'created': 0,
                  'enabled': True,
-                 'filenameFilter': {'enabled': True, 'matchType': 'CONTAINS', 'regex': '*.sfv',
-                                    'useRegex': False},
+                 'filenameFilter': {
+                     'enabled': True,
+                     'matchType': 'CONTAINS',
+                     'regex': '.*\\.(sfv|jpe?g|idx|sub|srt|nfo|bat|txt|exe)',
+                     'useRegex': True
+                 },
                  'filesizeFilter': {'enabled': False, 'from': 0, 'matchType': 'BETWEEN', 'to': 0},
                  'filetypeFilter': {'archivesEnabled': False, 'audioFilesEnabled': False, 'customs': None,
                                     'docFilesEnabled': False, 'enabled': False, 'exeFilesEnabled': False,
                                     'hashEnabled': False, 'imagesEnabled': False, 'matchType': 'IS',
                                     'subFilesEnabled': False, 'useRegex': False, 'videoFilesEnabled': False},
                  'hosterURLFilter': {'enabled': False, 'matchType': 'CONTAINS', 'regex': '', 'useRegex': False},
-                 'matchAlwaysFilter': {'enabled': False}, 'name': 'Quasarr_Block_SFV',
+                 'matchAlwaysFilter': {'enabled': False}, 'name': 'Quasarr_Block_Files',
                  'onlineStatusFilter': {'enabled': False, 'matchType': 'IS', 'onlineStatus': 'OFFLINE'},
                  'originFilter': {'enabled': False, 'matchType': 'IS', 'origins': []},
                  'packagenameFilter': {'enabled': False, 'matchType': 'CONTAINS', 'regex': '', 'useRegex': False},
