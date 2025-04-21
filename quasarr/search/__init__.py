@@ -8,6 +8,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from quasarr.providers.log import info
 from quasarr.search.sources.dd import dd_search
 from quasarr.search.sources.dw import dw_feed, dw_search
+from quasarr.search.sources.dt import dt_feed, dt_search
 from quasarr.search.sources.fx import fx_feed, fx_search
 from quasarr.search.sources.nx import nx_feed, nx_search
 from quasarr.search.sources.sf import sf_feed, sf_search
@@ -17,6 +18,7 @@ def get_search_results(shared_state, request_from, search_string="", mirror=None
     results = []
 
     dd = shared_state.values["config"]("Hostnames").get("dd")
+    dt = shared_state.values["config"]("Hostnames").get("dt")
     dw = shared_state.values["config"]("Hostnames").get("dw")
     fx = shared_state.values["config"]("Hostnames").get("fx")
     nx = shared_state.values["config"]("Hostnames").get("nx")
@@ -35,6 +37,8 @@ def get_search_results(shared_state, request_from, search_string="", mirror=None
             functions.append(lambda: dd_search(shared_state, start_time, search_string, mirror=mirror))
         if dw:
             functions.append(lambda: dw_search(shared_state, start_time, request_from, search_string, mirror=mirror))
+        if dt:
+            functions.append(lambda: dt_search(shared_state, start_time, request_from, search_string, mirror=mirror))
         if fx:
             functions.append(lambda: fx_search(shared_state, start_time, search_string, mirror=mirror))
         if nx:
@@ -44,6 +48,8 @@ def get_search_results(shared_state, request_from, search_string="", mirror=None
     else:
         if dd:
             functions.append(lambda: dd_search(shared_state, start_time, mirror=mirror))
+        if dt:
+            functions.append(lambda: dt_feed(shared_state, start_time, request_from, mirror=mirror))
         if dw:
             functions.append(lambda: dw_feed(shared_state, start_time, request_from, mirror=mirror))
         if fx:

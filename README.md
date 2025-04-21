@@ -118,8 +118,7 @@ Issues, feature and pull requests that are meant to introduce feature toggles wi
     - Existing settings in JDownloader
     - Existing tools from the *arr ecosystem that integrate directly with Radarr/Sonarr
 - There are no hostname integrations in active development.
-- Adding one or more hostnames focused on English content is highly desired.
-  - Please provide suggestions in a private thread on Discord.
+- **Adding additional hostnames focused on English content is highly desired. Please send your pull requests!**
 - Pull requests are welcome. Especially for popular hostnames.
     - Always reach out on Discord before starting work on a new feature.
     - Please follow the existing code style and project structure.
