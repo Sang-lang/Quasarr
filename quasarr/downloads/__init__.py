@@ -5,6 +5,7 @@
 import json
 
 from quasarr.downloads.sources.dd import get_dd_download_links
+from quasarr.downloads.sources.dt import get_dt_download_links
 from quasarr.downloads.sources.dw import get_dw_download_links
 from quasarr.downloads.sources.nx import get_nx_download_links
 from quasarr.downloads.sources.sf import get_sf_download_links, resolve_sf_redirect
@@ -320,6 +321,7 @@ def download(shared_state, request_from, title, url, mirror, size_mb, password, 
         imdb_id = None
 
     dd = shared_state.values["config"]("Hostnames").get("dd")
+    dt = shared_state.values["config"]("Hostnames").get("dt")
     dw = shared_state.values["config"]("Hostnames").get("dw")
     nx = shared_state.values["config"]("Hostnames").get("nx")
     sf = shared_state.values["config"]("Hostnames").get("sf")
@@ -337,6 +339,27 @@ def download(shared_state, request_from, title, url, mirror, size_mb, password, 
             info(f"Found 0 links decrypting {title}")
             package_id = None
 
+    elif dt and dt.lower() in url.lower():
+        links = get_dt_download_links(shared_state, url, mirror, title)
+        if links:
+            info(f"Decrypted {len(links)} download links for {title}")
+            send_discord_message(shared_state, title=title, case="unprotected", imdb_id=imdb_id)
+            added = shared_state.download_package(links, title, password, package_id)
+            if not added:
+                info(f"Failed to add {title} to linkgrabber")
+                package_id = None
+        else:
+            info(f"Found 0 links decrypting {title}")
+            package_id = None
+
+
+    elif dw and dw.lower() in url.lower():
+        links = get_dw_download_links(shared_state, url, mirror, title)
+        info(f'CAPTCHA-Solution required for "{title}" at: "{shared_state.values['external_address']}/captcha"')
+        send_discord_message(shared_state, title=title, case="captcha", imdb_id=imdb_id)
+        blob = json.dumps({"title": title, "links": links, "size_mb": size_mb, "password": password})
+        shared_state.values["database"]("protected").update_store(package_id, blob)
+
     elif nx and nx.lower() in url.lower():
         links = get_nx_download_links(shared_state, url, title)
         if links:
@@ -349,13 +372,6 @@ def download(shared_state, request_from, title, url, mirror, size_mb, password, 
         else:
             info(f"Found 0 links decrypting {title}")
             package_id = None
-
-    elif dw and dw.lower() in url.lower():
-        links = get_dw_download_links(shared_state, url, mirror, title)
-        info(f'CAPTCHA-Solution required for "{title}" at: "{shared_state.values['external_address']}/captcha"')
-        send_discord_message(shared_state, title=title, case="captcha", imdb_id=imdb_id)
-        blob = json.dumps({"title": title, "links": links, "size_mb": size_mb, "password": password})
-        shared_state.values["database"]("protected").update_store(package_id, blob)
 
     elif sf and sf.lower() in url.lower():
         if url.startswith(f"https://{sf}/external"):  # from interactive search

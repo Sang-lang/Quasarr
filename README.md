@@ -15,7 +15,7 @@ settings for Radarr/Sonarr.
 
 Quasarr includes a solution to quickly and easily decrypt protected links.
 [Active Sponsors get access to SponsorsHelper to do so automatically.](https://github.com/users/rix1337/sponsorship)
-Alternatively follow the link from the console output (or discord notification) to solve the CAPTCHA manually.
+Alternatively, follow the link from the console output (or discord notification) to solve the CAPTCHA manually.
 Quasarr will confidently handle the rest.
 
 # Instructions
@@ -27,16 +27,17 @@ Quasarr will confidently handle the rest.
     * Quasarr will become available once at least one suitable hostname is set.
 * Provide your [My-JDownloader-Credentials](https://my.jdownloader.org)
     * Consider setting up a fresh JDownloader before you begin.
-    * Quasarr will modify settings of JDownloader so downloads can be properly handled by Radarr/Sonarr.
-    * If using docker make extra sure that JDownloader's download path is available to Radarr/Sonarr with the exakt same
+    * Quasarr will modify the settings of JDownloader so downloads can be properly handled by Radarr/Sonarr.
+    * If using docker, make extra sure that JDownloader's download path is available to Radarr/Sonarr with the exact same
       internal and external path mapping. Just matching the external path is not enough.
 * Set up Quasarr as `Newznab Indexer` and `SABnzbd Download Client` in Radarr/Sonarr
-    * Use the API key from console output (or copy it from the Quasarr web UI)
-    * Leave all other settings at default.
+    * Use the API key from the console output (or copy it from the Quasarr web UI)
+    * Leave all other settings by default.
     * If you prefer to only get releases for a specific mirror, add the mirror name to the
       API path in the advanced indexer settings.
-      * Example: `/api/dropbox/` results will only return releases where `dropbox` is explicitly mentioned in link.
+      * Example: `/api/dropbox/` results will only return releases where `dropbox` is explicitly mentioned in a link.
       * This means that if a mirror is not available at a hostname, the release is ignored or the download will fail.
+        So use this option with caution.
 * To see download status information
     * Open `Activity` → `Queue` → `Options` in Radarr/Sonarr
     * Enable `Release Title`
@@ -62,14 +63,14 @@ docker run -d \
 * `DISCORD` is optional and must be a valid Discord Webhook URL.
 * `HOSTNAMES` is optional and allows skipping the manual hostname step during setup.
     * Must be a publicly available `HTTP` or `HTTPs` link
-    * Must be a raw `.ini` / text file (not html or json)
+    * Must be a raw `.ini` / text file (not HTML or JSON)
     * Must contain at least one valid Hostname per line `ab = xyz`
 * `SILENT` is optional and silences all discord notifications except for deletions by SponsorsHelper.
 * `DEBUG` is optional and enables debug logging. **Only use to create a GitHub issue!**
 
 # Manual setup
 
-Use this only in case you cant run the docker image.
+Use this only in case you can't run the docker image.
 
 `pip install `
 
@@ -93,7 +94,7 @@ Complexity is the killer of solo projects like this one. It must be fought at al
 Therefore, feature toggles to modify Quasarr's behavior will never be introduced to this project.
 
 Consider that every choice for the user must be reflected throughout the project.
-Every feature toggle therefore is a negative multiplier for future development efforts.
+Every feature toggle, therefore, is a negative multiplier for future development efforts.
 This project's predecessor [FeedCrawler](https://github.com/rix1337/FeedCrawler) died because it allowed an insane
 amount of flexibility.
 
@@ -117,8 +118,7 @@ Issues, feature and pull requests that are meant to introduce feature toggles wi
     - Existing settings in JDownloader
     - Existing tools from the *arr ecosystem that integrate directly with Radarr/Sonarr
 - There are no hostname integrations in active development.
-- Adding one or more hostnames focused on English content is highly desired.
-  - Please provide suggestions in a private thread on Discord.
+- **Adding additional hostnames focused on English content is highly desired. Please send your pull requests!**
 - Pull requests are welcome. Especially for popular hostnames.
     - Always reach out on Discord before starting work on a new feature.
     - Please follow the existing code style and project structure.
@@ -144,4 +144,5 @@ The `--internal_address` parameter is **mandatory**.
 CONFIG_VOLUMES=/path/to/config docker-compose -f docker/dev-services-compose.yml up
 ```
 
-Replace `/path/to/config` with your desired configuration location. The `CONFIG_VOLUMES` environment variable is **mandatory**.
+Replace `/path/to/config` with your desired configuration location.
+The `CONFIG_VOLUMES` environment variable is **mandatory**.
