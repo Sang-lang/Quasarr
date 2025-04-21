@@ -197,8 +197,9 @@ def run():
         print(f'Quasarr API now running at: "{shared_state.values['external_address']}"')
         print('Use the above URL to set up a "Newznab Indexer" and "SABnzbd Download Client" in Radarr/Sonarr')
         print(f'Leave all settings at default and use this API key: "{api_key}" (without quotes)')
-        print('Optionally set one desired mirror in "API Path" at the advanced indexer settings, e.g. "/api/dropbox/"')
-        print('For more details, check README.md on GitHub...')
+        print(
+            'Optionally set one desired mirror in "API Path" at the advanced indexer settings, e.g. "/api/dropbox/" instead of "/api/"')
+        print('For more details, check https://github.com/rix1337/Quasarr?tab=readme-ov-file#instructions.')
 
         print("\n===== Quasarr Info Log =====")
         if os.getenv('DEBUG'):
