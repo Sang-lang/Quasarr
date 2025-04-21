@@ -192,7 +192,6 @@ def setup_arr_routes(app):
                         debug(f'Search in Anime-Order is not supported. Ignoring request: {dict(request.query)}')
 
                     elif mode == 'tvsearch':
-                        # these are currently ignored, Sonarr handles them anyway
                         season = getattr(request.query, 'season', "")
                         episode = getattr(request.query, 'ep', "")
                         # only plain search string and tvrage id is implemented
