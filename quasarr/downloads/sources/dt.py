@@ -2,6 +2,7 @@
 # Quasarr
 # Project by https://github.com/rix1337
 
+import re
 import requests
 from bs4 import BeautifulSoup
 from quasarr.providers.log import info
@@ -24,25 +25,42 @@ def get_dt_download_links(shared_state, url, mirror, title):
             info(f"Could not find download section for {title}")
             return False
 
+        # grab all <a href="…">
         anchors = body.find_all("a", href=True)
+
     except Exception as e:
         info(f"DT site has been updated. Grabbing download links for {title} not possible! ({e})")
         return False
 
-    download_links = []
+    # first do your normal filtering
+    filtered = []
     for a in anchors:
         href = a["href"].strip()
 
         if not href.lower().startswith(("http://", "https://")):
             continue
-
-        lower_href = href.lower()
-        if "imdb.com" in lower_href or "?ref=" in lower_href:
+        lower = href.lower()
+        if "imdb.com" in lower or "?ref=" in lower:
             continue
-
         if mirror and mirror not in href:
             continue
 
-        download_links.append(href)
+        filtered.append(href)
 
-    return download_links
+    # if after filtering you got nothing, fall back to regex
+    if not filtered:
+        text = body.get_text(separator="\n")
+        urls = re.findall(r'https?://[^\s<>"\']+', text)
+        # de-dupe preserving order
+        seen = set()
+        for u in urls:
+            u = u.strip()
+            if u not in seen:
+                seen.add(u)
+                # apply same filters
+                low = u.lower()
+                if low.startswith(("http://", "https://")) and "imdb.com" not in low and "?ref=" not in low:
+                    if not mirror or mirror in u:
+                        filtered.append(u)
+
+    return filtered

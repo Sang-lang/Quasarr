@@ -7,6 +7,7 @@ import html
 import re
 import time
 from base64 import urlsafe_b64encode
+from datetime import timezone, timedelta
 from urllib.parse import quote_plus
 
 import requests
@@ -27,6 +28,31 @@ def extract_size(text):
         return {"size": size, "sizeunit": unit}
     else:
         raise ValueError(f"Invalid size format: {text}")
+
+
+def parse_published_datetime(article):
+    date_box = article.find('div', class_='mr-2 shadow-sm1 text-center')
+    mon = date_box.find('small').text.strip()
+    day = date_box.find('h4').text.strip()
+    year = date_box.find('h6').text.strip()
+    month_num = datetime.datetime.strptime(mon, '%b').month
+
+    time_icon = article.select_one('i.fa-clock-o')
+    if time_icon:
+        # its parent <span> contains e.g. "19:12"
+        raw = time_icon.parent.get_text(strip=True)
+        m = re.search(r'(\d{1,2}:\d{2})', raw)
+        if m:
+            hh, mm = map(int, m.group(1).split(':'))
+        else:
+            hh, mm = 0, 0
+    else:
+        hh, mm = 0, 0
+
+    # this timezone is fixed to CET+1 and might be wrong
+    cet = timezone(timedelta(hours=1))
+    dt = datetime.datetime(int(year), month_num, int(day), hh, mm, tzinfo=cet)
+    return dt.isoformat()
 
 
 def dt_feed(shared_state, start_time, request_from, mirror=None):
@@ -73,12 +99,7 @@ def dt_feed(shared_state, start_time, request_from, mirror=None):
                 mb = shared_state.convert_to_mb(size_item)
                 size = mb * 1024 * 1024
 
-                date_box = article.find('div', class_='mr-2 shadow-sm1 text-center')
-                mon = date_box.find('small').text.strip()
-                day = date_box.find('h4').text.strip()
-                year = date_box.find('h6').text.strip()
-                month_num = datetime.datetime.strptime(mon, '%b').month
-                published = datetime.date(int(year), month_num, int(day)).isoformat()
+                published = parse_published_datetime(article)
 
                 payload = urlsafe_b64encode(
                     f"{title}|{source}|{mirror}|{mb}|{password}|{imdb_id}".encode("utf-8")
@@ -180,12 +201,7 @@ def dt_search(shared_state, start_time, request_from, search_string, mirror=None
                 mb = shared_state.convert_to_mb(size_item)
                 size = mb * 1024 * 1024
 
-                date_box = article.find("div", class_="mr-2 shadow-sm1 text-center")
-                mon = date_box.find("small").text.strip()
-                day = date_box.find("h4").text.strip()
-                year = date_box.find("h6").text.strip()
-                month_num = datetime.datetime.strptime(mon, "%b").month
-                published = datetime.date(int(year), month_num, int(day)).isoformat()
+                published = parse_published_datetime(article)
 
                 payload = urlsafe_b64encode(
                     f"{title}|{source}|{mirror}|{mb}|{password}|{imdb_id}"
