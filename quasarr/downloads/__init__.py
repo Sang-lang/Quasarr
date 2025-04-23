@@ -324,8 +324,7 @@ def delete_package(shared_state, package_id):
     packages = get_packages(shared_state)
     for package_location in packages:
         for package in packages[package_location]:
-            if package["nzo_id"] == package_id:
-                # Always delete from all locations to cover potential edge cases (e.g. package was just moved)
+            if package["type"] == "linkgrabber":
                 ids = get_links_matching_package_uuid(package, shared_state.get_device().linkgrabber.query_links())
                 shared_state.get_device().linkgrabber.cleanup(
                     "DELETE_ALL",
@@ -334,7 +333,7 @@ def delete_package(shared_state, package_id):
                     ids,
                     [package["uuid"]]
                 )
-
+            elif package["type"] == "downloader":
                 ids = get_links_matching_package_uuid(package, shared_state.get_device().downloads.query_links())
                 shared_state.get_device().downloads.cleanup(
                     "DELETE_ALL",
@@ -344,18 +343,16 @@ def delete_package(shared_state, package_id):
                     [package["uuid"]]
                 )
 
-                shared_state.get_db("failed").delete(package_id)
-                shared_state.get_db("protected").delete(package_id)
+            # no state check, just clean up whatever exists with the package id
+            shared_state.get_db("failed").delete(package_id)
+            shared_state.get_db("protected").delete(package_id)
 
-                if package_location == "queue":
-                    package_name_field = "filename"
-                else:
-                    package_name_field = "name"
+            if package_location == "queue":
+                package_name_field = "filename"
+            else:
+                package_name_field = "name"
 
-                deleted = package[package_name_field]
-                break
-        if deleted:
-            break
+            deleted = package[package_name_field]
 
     if deleted:
         info(f'Deleted package "{deleted}" with ID "{package_id}"')
