@@ -95,7 +95,7 @@ def get_sf_download_links(shared_state, url, mirror, title):
                         if not release_url:
                             info(f"Could not find mirror '{mirror}' for '{title}'")
                     else:
-                        release_url = next(iter(mirrors["season"]))
+                        release_url = next(iter(mirrors["season"].values()))
 
                     real_url = resolve_sf_redirect(release_url, shared_state.values["user_agent"])
                     return real_url
