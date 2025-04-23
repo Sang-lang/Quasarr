@@ -50,6 +50,15 @@ def parse_mirrors(base_url, entry):
             if len(host) > 2:  # episode hosts are 2 chars
                 season[host] = f"{base_url}{a['href']}"
 
+        # fallback: if mirrors are falsely missing a mirror title, return first season link as "filecrypt"
+        if not season:
+            fallback = next(
+                (a for a in entry.select('a.dlb.row') if not a.find_parent('div.list.simple')),
+                None
+            )
+            if fallback:
+                season['filecrypt'] = f"{base_url}{fallback['href']}"
+
         episodes = []
         for ep_row in entry.select('div.list.simple > div.row'):
             if 'head' in ep_row.get('class', []):
