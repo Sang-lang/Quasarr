@@ -21,7 +21,21 @@ def is_last_section_integer(url):
 
 def get_sf_download_links(shared_state, url, mirror, title):
     release_pattern = re.compile(
-        r'^(?P<name>.+?)\.S(?P<season>\d+)(?:E\d+)?\..*?\.(?P<resolution>\d+p)\..+?-(?P<group>\w+)$', re.IGNORECASE)
+        r'''
+          ^                                   # start of string
+          (?P<name>.+?)\.                     # show name (dots in name) up to the dot before “S”
+          S(?P<season>\d+)                    # “S” + season number
+          (?:E\d+(?:-E\d+)?)?                 # optional “E##” or “E##-E##”
+          \.                                  # literal dot
+          .*?\.                               # anything (e.g. language/codec) up to next dot
+          (?P<resolution>\d+p)                # resolution “720p”, “1080p”, etc.
+          \..+?                               # dot + more junk (e.g. “.WEB.h264”)
+          -(?P<group>\w+)                     # dash + release group at end
+          $                                   # end of string
+        ''',
+        re.IGNORECASE | re.VERBOSE
+    )
+
     release_match = release_pattern.match(title)
 
     if not release_match:
