@@ -828,7 +828,8 @@ class Myjdapi:
                 encrypted_response = requests.post(
                     request_url,
                     headers={
-                        "Content-Type": "application/aesjson-jd; charset=utf-8"
+                        "Content-Type": "application/aesjson-jd; charset=utf-8",
+                        "User-Agent": "Quasarr"
                     },
                     data=encrypted_data,
                     timeout=timeout
@@ -838,7 +839,8 @@ class Myjdapi:
                     encrypted_response = requests.post(
                         request_url,
                         headers={
-                            "Content-Type": "application/aesjson-jd; charset=utf-8"
+                            "Content-Type": "application/aesjson-jd; charset=utf-8",
+                            "User-Agent": "Quasarr"
                         },
                         data=encrypted_data,
                         timeout=timeout,

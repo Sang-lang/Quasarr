@@ -50,10 +50,15 @@ def get_links_status(package, all_links):
             has_mirror_all_online = True
             break
 
+    offline_links = [link for link in links_in_package if link.get('availability', '').lower() == 'offline']
+    offline_ids = [link.get('uuid') for link in offline_links]
+    offline_mirror_linkids = offline_ids if has_mirror_all_online else []
+
     for link in links_in_package:
-        availability = link.get('availability', "")
-        if availability.lower() == "offline" and not has_mirror_all_online:
+        if link.get('availability', "").lower() == "offline" and not has_mirror_all_online:
             error = "Links offline for all mirrors"
+        if link.get('statusIconKey', '').lower() == "false":
+            error = "File error in package"
         link_finished = link.get('finished', False)
         link_extraction_status = link.get('extractionStatus', '').lower()  # "error" signifies an issue
         link_eta = link.get('eta', 0) // 1000
@@ -67,7 +72,7 @@ def get_links_status(package, all_links):
                     eta = link_eta
             all_finished = False
 
-    return {"all_finished": all_finished, "eta": eta, "error": error}
+    return {"all_finished": all_finished, "eta": eta, "error": error, "offline_mirror_linkids": offline_mirror_linkids}
 
 
 def get_links_matching_package_uuid(package, package_links):
@@ -146,7 +151,18 @@ def get_packages(shared_state):
         for package in linkgrabber_packages:
             comment = get_links_comment(package, shared_state.get_device().linkgrabber.query_links())
             link_details = get_links_status(package, linkgrabber_links)
+
             error = link_details["error"]
+            offline_mirror_linkids = link_details["offline_mirror_linkids"]
+            if offline_mirror_linkids:
+                shared_state.get_device().linkgrabber.cleanup(
+                    "DELETE_OFFLINE",
+                    "REMOVE_LINKS_ONLY",
+                    "SELECTED",
+                    offline_mirror_linkids,
+                    [package["uuid"]]
+                )
+
             location = "history" if error else "queue"
             packages.append({
                 "details": package,
@@ -317,56 +333,94 @@ def get_packages(shared_state):
         else:
             info(f"Invalid package location {package['location']}")
 
+    if not shared_state.get_device().linkgrabber.is_collecting():
+        linkgrabber_packages = shared_state.get_device().linkgrabber.query_packages()
+        linkgrabber_links = shared_state.get_device().linkgrabber.query_links()
+
+        packages_to_start = []
+        links_to_start = []
+
+        for package in linkgrabber_packages:
+            comment = get_links_comment(package, shared_state.get_device().linkgrabber.query_links())
+            if comment.startswith("Quasarr_"):
+                package_uuid = package.get("uuid")
+                if package_uuid:
+                    linkgrabber_links = [link.get("uuid") for link in linkgrabber_links if
+                                         link.get("packageUUID") == package_uuid]
+                    if linkgrabber_links:
+                        packages_to_start.append(package_uuid)
+                        links_to_start.extend(linkgrabber_links)
+                    else:
+                        info(f"Package {package_uuid} has no links in linkgrabber - skipping start")
+
+                    break
+
+        if packages_to_start and links_to_start:
+            shared_state.get_device().linkgrabber.move_to_downloadlist(links_to_start, packages_to_start)
+            info(f"Started {len(packages_to_start)} package download"
+                 f"{'s' if len(packages_to_start) > 1 else ''} from linkgrabber")
+
     return downloads
 
 
 def delete_package(shared_state, package_id):
-    deleted = ""
+    try:
+        deleted_title = ""
 
-    packages = get_packages(shared_state)
-    for package_location in packages:
-        for package in packages[package_location]:
-            if package["nzo_id"] == package_id:
-                if package["type"] == "linkgrabber":
-                    ids = get_links_matching_package_uuid(package, shared_state.get_device().linkgrabber.query_links())
-                    if ids:
-                        shared_state.get_device().linkgrabber.cleanup(
-                            "DELETE_ALL",
-                            "REMOVE_LINKS_AND_DELETE_FILES",
-                            "SELECTED",
-                            ids,
-                            [package["uuid"]]
-                        )
-                        break
-                elif package["type"] == "downloader":
-                    ids = get_links_matching_package_uuid(package, shared_state.get_device().downloads.query_links())
-                    if ids:
-                        shared_state.get_device().downloads.cleanup(
-                            "DELETE_ALL",
-                            "REMOVE_LINKS_AND_DELETE_FILES",
-                            "SELECTED",
-                            ids,
-                            [package["uuid"]]
-                        )
-                        break
+        packages = get_packages(shared_state)
+        for package_location in packages:
+            for package in packages[package_location]:
+                if package["nzo_id"] == package_id:
+                    if package["type"] == "linkgrabber":
+                        ids = get_links_matching_package_uuid(package,
+                                                              shared_state.get_device().linkgrabber.query_links())
+                        if ids:
+                            shared_state.get_device().linkgrabber.cleanup(
+                                "DELETE_ALL",
+                                "REMOVE_LINKS_AND_DELETE_FILES",
+                                "SELECTED",
+                                ids,
+                                [package["uuid"]]
+                            )
+                            break
+                    elif package["type"] == "downloader":
+                        ids = get_links_matching_package_uuid(package,
+                                                              shared_state.get_device().downloads.query_links())
+                        if ids:
+                            shared_state.get_device().downloads.cleanup(
+                                "DELETE_ALL",
+                                "REMOVE_LINKS_AND_DELETE_FILES",
+                                "SELECTED",
+                                ids,
+                                [package["uuid"]]
+                            )
+                            break
 
-                # no state check, just clean up whatever exists with the package id
-                shared_state.get_db("failed").delete(package_id)
-                shared_state.get_db("protected").delete(package_id)
+                    # no state check, just clean up whatever exists with the package id
+                    shared_state.get_db("failed").delete(package_id)
+                    shared_state.get_db("protected").delete(package_id)
 
-                if package_location == "queue":
-                    package_name_field = "filename"
-                else:
-                    package_name_field = "name"
+                    if package_location == "queue":
+                        package_name_field = "filename"
+                    else:
+                        package_name_field = "name"
 
-                deleted = package[package_name_field]
-                break
+                    try:
+                        deleted_title = package[package_name_field]
+                    except KeyError:
+                        pass
 
-    if deleted:
-        info(f'Deleted package "{deleted}" with ID "{package_id}"')
-    else:
-        info(f'Failed to delete package "{package_id}"')
-    return deleted
+                    # Leave the loop
+                    break
+
+        if deleted_title:
+            info(f'Deleted package "{deleted_title}" with ID "{package_id}"')
+        else:
+            info(f'Deleted package "{package_id}"')
+    except:
+        info(f"Failed to delete package {package_id}")
+        return False
+    return True
 
 
 def download(shared_state, request_from, title, url, mirror, size_mb, password, imdb_id=None):
