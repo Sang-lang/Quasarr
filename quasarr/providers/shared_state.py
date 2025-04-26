@@ -243,9 +243,27 @@ def set_device_settings():
         {
             "namespace": "org.jdownloader.gui.views.linkgrabber.addlinksdialog.LinkgrabberSettings",
             "storage": None,
+            "setting": "OfflinePackageEnabled",
+            "expected_value": False,  # Don't move offline links to extra package
+        },
+        {
+            "namespace": "org.jdownloader.gui.views.linkgrabber.addlinksdialog.LinkgrabberSettings",
+            "storage": None,
             "setting": "HandleOfflineOnConfirmLatestSelection",
-            "expected_value": "EXCLUDE_OFFLINE_AND_REMOVE",  # Prevents popup starting download with offline mirrors
-        }
+            "expected_value": "INCLUDE_OFFLINE",  # Offline links must always be kept for Quasarr to handle packages
+        },
+        {
+            "namespace": "org.jdownloader.gui.views.linkgrabber.addlinksdialog.LinkgrabberSettings",
+            "storage": None,
+            "setting": "AutoConfirmManagerHandleOffline",
+            "expected_value": "INCLUDE_OFFLINE",  # Offline links must always be kept for Quasarr to handle packages
+        },
+        {
+            "namespace": "org.jdownloader.gui.views.linkgrabber.addlinksdialog.LinkgrabberSettings",
+            "storage": None,
+            "setting": "DefaultOnAddedOfflineLinksAction",
+            "expected_value": "INCLUDE_OFFLINE",  # Offline links must always be kept for Quasarr to handle packages
+        },
     ]
 
     for setting in settings_to_enforce:
@@ -467,7 +485,7 @@ def download_package(links, title, password, package_id):
     device = get_device()
     downloaded = device.linkgrabber.add_links(params=[
         {
-            "autostart": True,
+            "autostart": False,
             "links": json.dumps(links),
             "packageName": title,
             "extractPassword": password,
