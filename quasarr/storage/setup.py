@@ -27,7 +27,7 @@ def path_config(shared_state):
     def config_form():
         config_form_html = f'''
             <form action="/api/config" method="post">
-                <label for="config_path">Path</label><br>
+                <label for="config_path">Path</label>
                 <input type="text" id="config_path" name="config_path" placeholder="{current_path}"><br>
                 {render_button("Save", "primary", {"type": "submit"})}
             </form>
@@ -71,7 +71,7 @@ def hostnames_config(shared_state):
     @app.get('/')
     def hostname_form():
         hostname_fields = '''
-        <label for="{id}">{label}</label><br>
+        <label for="{id}">{label}</label>
         <input type="text" id="{id}" name="{id}" placeholder="example.com" autocorrect="off" autocomplete="off"><br>
         '''
 
@@ -128,10 +128,10 @@ def hostname_credentials_config(shared_state, shorthand, domain):
     def credentials_form():
         form_content = f'''
         <span>If required register account at: <a href="https://{domain}">{domain}</a>!</span><br><br>
-        <label for="user">Username</label><br>
-        <input type="text" id="user" name="user" placeholder="user" autocorrect="off"><br>
+        <label for="user">Username</label>
+        <input type="text" id="user" name="user" placeholder="User" autocorrect="off"><br>
 
-        <label for="password">Password</label><br>
+        <label for="password">Password</label>
         <input type="password" id="password" name="password" placeholder="Password"><br>
         '''
 
@@ -185,18 +185,21 @@ def jdownloader_config(shared_state):
         my.jdownloader.org</a>!</span><br><br>
         
         <form id="verifyForm" action="/api/verify_jdownloader" method="post">
-            <label for="user">E-Mail</label><br>
+            <label for="user">E-Mail</label>
             <input type="text" id="user" name="user" placeholder="user@example.org" autocorrect="off"><br>
-            <label for="pass">Password</label><br>
+            <label for="pass">Password</label>
             <input type="password" id="pass" name="pass" placeholder="Password"><br>
             {render_button("Verify Credentials",
                            "secondary",
                            {"id": "verifyButton", "type": "button", "onclick": "verifyCredentials()"})}
         </form>
+        
+        <p>Some JDownloader settings will be enforced by Quasarr on startup.</p>
+        
         <form action="/api/store_jdownloader" method="post" id="deviceForm" style="display: none;">
             <input type="hidden" id="hiddenUser" name="user">
             <input type="hidden" id="hiddenPass" name="pass">
-            <label for="device">JDownloader</label><br>
+            <label for="device">JDownloader</label>
             <select id="device" name="device"></select><br>
             {render_button("Save", "primary", {"type": "submit"})}
         </form>

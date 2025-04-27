@@ -23,12 +23,15 @@ def setup_captcha_routes(app):
         except KeyError:
             device = None
         if not device:
-            return render_centered_html(f'''<h1>Quasarr</h1>
-            <p>JDownloader connection not established.</p>''')
+            return render_centered_html(f'''<h1><img src="https://raw.githubusercontent.com/rix1337/Quasarr/main/Quasarr.png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
+            <p>JDownloader connection not established.</p>
+            <p>
+                {render_button("Back", "secondary", {"onclick": "location.href='/'"})}
+            </p>''')
 
         protected = shared_state.get_db("protected").retrieve_all_titles()
         if not protected:
-            return render_centered_html(f'''<h1>Quasarr</h1>
+            return render_centered_html(f'''<h1><img src="https://raw.githubusercontent.com/rix1337/Quasarr/main/Quasarr.png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
             <p>No protected packages found! CAPTCHA not needed.</p>
             <p>
                 {render_button("Confirm", "secondary", {"onclick": "location.href='/'"})}
@@ -107,12 +110,14 @@ def setup_captcha_routes(app):
                 }
                 ''' + captcha_js() + f'''</script>
                 <div>
-                    <h1>Quasarr</h1>
+                    <h1><img src="https://raw.githubusercontent.com/rix1337/Quasarr/main/Quasarr.png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
                     <div id="captcha-key"></div>
                     {link_select}<br><br>
                     <input type="hidden" id="link-hidden" value="{links[0][0]}" />
-                    <div id="puzzle-captcha" aria-style="mobile">
-                        <strong>Your adblocker prevents the captcha from loading. Disable it!</strong>
+                    <div class="captcha-container">
+                        <div id="puzzle-captcha" aria-style="mobile">
+                            <strong>Your adblocker prevents the captcha from loading. Disable it!</strong>
+                        </div>
                     </div>
                     <div id="reload-button" style="display: none;">
                     <p>
@@ -120,6 +125,10 @@ def setup_captcha_routes(app):
             "onclick": "location.reload()",
         })}</p>
         </div>
+            <br>
+            <p>
+                {render_button("Back", "secondary", {"onclick": "location.href='/'"})}
+            </p>
                 </div>
                 </html>''')
 
