@@ -3,98 +3,199 @@
 # Project by https://github.com/rix1337
 
 def render_centered_html(inner_content):
-    style_outer = """
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-    max-height: 100vh;
-    overflow-y: auto;
-    overflow-x: hidden; /* Prevent horizontal scrolling */
-    width: 100%; /* Ensure it spans full width */
-    background-color: #212529;
-    color: #fff;
-    font-family: system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',
-    'Noto Sans','Liberation Sans',Arial,sans-serif,'Apple Color Emoji',
-    'Segoe UI Emoji','Segoe UI Symbol','Noto Color Emoji';
-    """
-    style_inner = """
-    background-color: #fff;
-    border-radius: 0.375rem;
-    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-    padding: 4px;
-    text-align: center;
-    color: #212529;
-    font-size: 1rem;
-    font-weight: 400;
-    line-height: 1.5;
-    box-sizing: border-box; /* Ensure padding doesn’t exceed boundaries */
-    max-width: 100%; /* Allow content to shrink */
-    margin: auto;
-    """
-
-    return f'''
-    <html>
+    head = '''
     <head>
+        <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>Quasarr</title>
-    </head>
+        <link rel="icon" href="https://raw.githubusercontent.com/rix1337/Quasarr/main/Quasarr.png">
+        <style>
+            /* Logo and heading alignment */
+            h1 {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                margin-bottom: 0.5rem;
+                font-size: 2rem;
+            }
+            .logo {
+                width: 48px;
+                height: 48px;
+                margin-right: 0.5rem;
+            }
+
+            /* Form labels and inputs */
+            label {
+                display: block;
+                font-weight: 600;
+                margin-bottom: 0.5rem;
+            }
+            input, select {
+                display: block;
+                width: 100%;
+                padding: 0.5rem;
+                font-size: 1rem;
+                border: 1px solid #ced4da;
+                border-radius: 0.5rem;
+                background-color: var(--card-bg);
+                color: var(--fg-color);
+                margin-bottom: 1rem;
+                box-sizing: border-box;
+            }
+
+            /* Theme variables */
+            :root {
+                --bg-color: #ffffff;
+                --fg-color: #212529;
+                --card-bg: #ffffff;
+                --card-shadow: rgba(0, 0, 0, 0.1);
+                --primary: #0d6efd;
+                --secondary: #6c757d;
+                --code-bg: #f8f9fa;
+                --spacing: 1rem;
+            }
+            @media (prefers-color-scheme: dark) {
+                :root {
+                    --bg-color: #181a1b;
+                    --fg-color: #f1f1f1;
+                    --card-bg: #242526;
+                    --card-shadow: rgba(0, 0, 0, 0.5);
+                    --code-bg: #2c2f33;
+                }
+            }
+            *, *::before, *::after {
+                box-sizing: border-box;
+            }
+            html, body {
+                margin: 0;
+                padding: 0;
+                width: 100%;
+                height: 100%;
+                background-color: var(--bg-color);
+                color: var(--fg-color);
+                font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue',
+                    'Noto Sans', Arial, sans-serif;
+                line-height: 1.6;
+            }
+            .outer {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                min-height: 100vh; /* allow container to expand */
+                padding: var(--spacing);
+            }
+            .inner {
+                background-color: var(--card-bg);
+                border-radius: 1rem;
+                box-shadow: 0 0.5rem 1.5rem var(--card-shadow);
+                padding: calc(var(--spacing) * 2);
+                text-align: center;
+                width: 100%;
+                max-width: fit-content;
+            }
+            /* Media query for small screens (e.g., max-width: 600px) */
+            @media (max-width: 600px) {
+                .outer {
+                    padding-left: 0;
+                    padding-right: 0;
+                }
+            
+                .inner {
+                    padding-left: 0;
+                    padding-right: 0;
+                }
+            }
+            h2 {
+                margin-top: var(--spacing);
+                margin-bottom: 0.75rem;
+                font-size: 1.5rem;
+            }
+            h3 {
+                margin-top: var(--spacing);
+                margin-bottom: 0.5rem;
+                font-size: 1.125rem;
+                font-weight: 500;
+            }
+            p {
+                margin: 0.5rem 0;
+            }
+            .inline-code, code {
+                display: block;
+                background-color: var(--code-bg);
+                padding: 0.5rem;
+                border-radius: 0.5rem;
+                font-family: monospace;
+                word-break: break-all;
+                margin: var(--spacing) 0;
+            }
+            .api-key-wrapper {
+                display: flex;
+                gap: 0.5rem;
+                flex-wrap: wrap;
+                justify-content: center;
+                margin-bottom: var(--spacing);
+            }
+            .captcha-container {
+                background-color: var(--secondary);
+            }
+            button {
+                padding: 0.5rem 1rem;
+                font-size: 1rem;
+                border-radius: 0.5rem;
+                font-weight: 500;
+                cursor: pointer;
+                transition: background-color 0.2s ease, border-color 0.2s ease;
+                border: none;
+                margin-top: 0.5rem;
+            }
+            .btn-primary {
+                background-color: var(--primary);
+                color: #fff;
+            }
+            .btn-secondary {
+                background-color: var(--secondary);
+                color: #fff;
+            }
+            .small {
+                font-size: 0.875rem;
+                padding: 0.25rem 0.5rem;
+            }
+            a {
+                color: var(--primary);
+                text-decoration: none;
+            }
+            a:hover {
+                text-decoration: underline;
+            }
+        </style>
+    </head>'''
+
+    body = f'''
+    {head}
     <body>
-    <div style="{style_outer.strip()}">
-        <div style="{style_inner.strip()}">
-            {inner_content}
+        <div class="outer">
+            <div class="inner">
+                {inner_content}
+            </div>
         </div>
-    </div>
     </body>
-    </html>
     '''
+    return f'<html>{body}</html>'
 
 
 def render_button(text, button_type="primary", attributes=None):
-    base_style = (
-        "padding: 0.375rem 0.75rem; font-size: 1rem; line-height: 1.5; "
-        "border-radius: 0.375rem; color: #fff; display: inline-block; "
-        "font-weight: 400; text-align: center; vertical-align: middle; "
-        "cursor: pointer; -webkit-user-select: none; -moz-user-select: none; "
-        "user-select: none; transition: color 0.15s ease-in-out, "
-        "background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, "
-        "box-shadow 0.15s ease-in-out; "
-    )
-
-    if button_type == "primary":
-        style = base_style + "background-color: #0d6efd; border: 1px solid #0d6efd; "
-    else:
-        style = base_style + "background-color: #6c757d; border: 1px solid #6c757d; "
-
-    attr_str = ' '.join(f'{key}="{value}"' for key, value in attributes.items()) if attributes else ""
-
-    return f'<button style="{style}" {attr_str}>{text}</button>'
+    # Map types to classes
+    cls = "btn-primary" if button_type == "primary" else "btn-secondary"
+    attr_str = ''
+    if attributes:
+        attr_str = ' '.join(f'{key}="{value}"' for key, value in attributes.items())
+    return f'<button class="{cls}" {attr_str}>{text}</button>'
 
 
 def render_form(header, form="", script=""):
-    styles = """
-    <style>
-        input, select {
-            display: block;
-            padding: .375rem .75rem;
-            width: 100%;
-            font-size: 1rem;
-            font-weight: 400;
-            line-height: 1.5;
-            color: #212529;
-            background-color: #fff;
-            border: 1px solid #dee2e6;
-            border-radius: .375rem;
-            transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
-            text-align: center;
-            margin: 10px auto;
-        }
-    </style>
-    """
     content = f'''
-    <h1>Quasarr</h1>
-    <h3>{header}</h3>
-    {styles}
+    <h1><img src="https://raw.githubusercontent.com/rix1337/Quasarr/main/Quasarr.png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
+    <h2>{header}</h2>
     {form}
     {script}
     '''
@@ -103,37 +204,34 @@ def render_form(header, form="", script=""):
 
 def render_success(message, timeout=10):
     button_html = render_button(f"Wait time... {timeout}", "secondary", {"id": "nextButton", "disabled": "true"})
-    script = f"""
-                <script>
-                    var counter = {timeout};
-                    var interval = setInterval(function() {{
-                        counter--;
-                        document.getElementById('nextButton').innerText = 'Wait time... ' + counter;
-                        if (counter === 0) {{
-                            clearInterval(interval);
-                            document.getElementById('nextButton').innerText = 'Continue';
-                            document.getElementById('nextButton').disabled = false;
-                            document.getElementById('nextButton').onclick = function() {{
-                                window.location.href='/';
-                            }};
-                            // Change button style to primary
-                            document.getElementById('nextButton').style.backgroundColor = '#0d6efd';
-                            document.getElementById('nextButton').style.borderColor = '#0d6efd';
-                        }}
-                    }}, 1000);
-                </script>
-                """
-    content = f"""<h1>Quasarr</h1>
-                <h3>{message}</h3>
-                {button_html}
-                {script}
-                """
+    script = f'''
+        <script>
+            let counter = {timeout};
+            const btn = document.getElementById('nextButton');
+            const interval = setInterval(() => {{
+                counter--;
+                btn.innerText = `Wait time... ${{counter}}`;
+                if (counter === 0) {{
+                    clearInterval(interval);
+                    btn.innerText = 'Continue';
+                    btn.disabled = false;
+                    btn.className = 'btn-primary';
+                    btn.onclick = () => window.location.href = '/';
+                }}
+            }}, 1000);
+        </script>
+    '''
+    content = f'''<h1><img src="https://raw.githubusercontent.com/rix1337/Quasarr/main/Quasarr.png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
+    <h2>{message}</h2>
+    {button_html}
+    {script}
+    '''
     return render_centered_html(content)
 
 
 def render_fail(message):
     button_html = render_button("Back", "secondary", {"onclick": "window.location.href='/'"})
-    return render_centered_html(f"""<h1>Quasarr</h1>
-                        <h3>{message}</h3>
-                        {button_html}
-                        """)
+    return render_centered_html(f"""<h1><img src="https://raw.githubusercontent.com/rix1337/Quasarr/main/Quasarr.png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
+        <h2>{message}</h2>
+        {button_html}
+    """)

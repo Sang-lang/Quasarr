@@ -29,43 +29,48 @@ def get_api(shared_state_dict, shared_state_lock):
 
         captcha_hint = ""
         if protected:
-            package_count = len(protected)
-            package_text = f"Package{'s' if package_count > 1 else ''} protected by CAPTCHA"
-            amount_info = f": {package_count}" if package_count > 1 else ""
-            button_text = f"Solve CAPTCHA{'s' if package_count > 1 else ''} manually to decrypt links!"
-
-            captcha_hint = f'''
-            <h2>Protected links</h2>
-            <p>{package_text}{amount_info}</p>
-            <p>{render_button(button_text, "primary", {"onclick": "location.href='/captcha'"})}</p>
-            <a href="https://github.com/users/rix1337/sponsorship" target="_blank">
-                For automated CAPTCHA Solutions use SponsorsHelper!
-            </a>
-            '''
-
-        small = 'small style="background-color: #f0f0f0; padding: 5px; border-radius: 3px;"'
+            plural = 's' if len(protected) > 1 else ''
+            captcha_hint = f"""
+            <h2>Protected link{plural} found</h2>
+            <p>{render_button(f"Solve CAPTCHA{plural}", 'primary', {'onclick': "location.href='/captcha'"})}</p>
+            <a href="https://github.com/users/rix1337/sponsorship" target="_blank">For automated CAPTCHA solutions, use SponsorsHelper!</a>
+            """
 
         info = f"""
-        <h1>Quasarr</h1>
+        <h1><img src="https://raw.githubusercontent.com/rix1337/Quasarr/main/Quasarr.png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
         {captcha_hint}
         <h2>Setup Instructions</h2>
-        <p>
-            <h3>Radarr/Sonarr</h3>
-            Use this exact URL as <{small}>Newznab Indexer</small> and <{small}>SABnzbd Download Client</small>:<br><br>
-            <code style="background-color: #f0f0f0; padding: 5px; border-radius: 3px;">
-                {shared_state.values["internal_address"]}
-            </code>
-        </p>
-        <p>
-            Leave settings at default and use this API key:<br><br>
-            <{small}>{api_key}</small>
-        </p>
-        <p>
-            {render_button("Regenerate API key",
-                           "secondary",
-                           {"onclick": "if(confirm('Are you sure you want to regenerate the API key?')) { location.href='/regenerate-api-key'; }"})}
-        </p>
-        <p>Some JDownloader settings will be enforced by Quasarr on startup.</p>
+        <p>Use this exact URL as <small>Newznab Indexer</small> and <small>SABnzbd Download Client</small> in Radarr/Sonarr:</p>
+        <code class=\"inline-code\">{shared_state.values['internal_address']}</code>
+
+        <h3>API Key</h3>
+        <div class=\"api-key-wrapper\">
+          <input id=\"apiKeyInput\" class=\"api-key-input\" type=\"password\" readonly value=\"{api_key}\" />
+          <button id=\"toggleKey\" class=\"btn-secondary small\">Show</button>
+          <button id=\"copyKey\" class=\"btn-primary small\">Copy</button>
+        </div>
+
+        <p>{render_button("Regenerate API key", "secondary", {"onclick": "if(confirm('Regenerate API key?')) location.href='/regenerate-api-key';"})}</p>
+
+        <script>
+          const apiInput = document.getElementById('apiKeyInput');
+          const toggleBtn = document.getElementById('toggleKey');
+          const copyBtn = document.getElementById('copyKey');
+
+          toggleBtn.onclick = () => {{
+            const isHidden = apiInput.type === 'password';
+            apiInput.type = isHidden ? 'text' : 'password';
+            toggleBtn.innerText = isHidden ? 'Hide' : 'Show';
+          }};
+          copyBtn.onclick = () => {{
+            apiInput.type = 'text';
+            apiInput.select();
+            document.execCommand('copy');
+            copyBtn.innerText = 'Copied!';
+            toggleBtn.innerText = 'Hide';
+            setTimeout(() => {{ copyBtn.innerText = 'Copy'; }}, 2000);
+          }};
+        </script>
         """
         return render_centered_html(info)
 
@@ -74,8 +79,8 @@ def get_api(shared_state_dict, shared_state_lock):
         api_key = shared_state.generate_api_key()
         return f"""
         <script>
-            alert('API key replaced with: "{api_key}!"');
-            window.location.href = '/';
+          alert('API key replaced with: {api_key}');
+          window.location.href = '/';
         </script>
         """
 

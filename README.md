@@ -65,7 +65,7 @@ docker run -d \
     * Must be a publicly available `HTTP` or `HTTPs` link
     * Must be a raw `.ini` / text file (not HTML or JSON)
     * Must contain at least one valid Hostname per line `ab = xyz`
-* `SILENT` is optional and silences all discord notifications except for deletions by SponsorsHelper.
+* `SILENT` is optional and silences all discord notifications except for error messages from SponsorsHelper.
 * `DEBUG` is optional and enables debug logging. **Only use to create a GitHub issue!**
 
 # Manual setup
