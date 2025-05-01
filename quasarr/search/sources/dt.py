@@ -57,8 +57,8 @@ def parse_published_datetime(article):
 
 def dt_feed(shared_state, start_time, request_from, mirror=None):
     releases = []
-    dw = shared_state.values["config"]("Hostnames").get(hostname.lower())
-    password = dw
+    dt = shared_state.values["config"]("Hostnames").get(hostname.lower())
+    password = dt
 
     feed_type = "media/videos/" if "Radarr" in request_from else "media/tv-show/"
 
@@ -66,7 +66,7 @@ def dt_feed(shared_state, start_time, request_from, mirror=None):
         debug(f'Mirror "{mirror}" not supported by "{hostname.upper()}". Supported: {supported_mirrors}. Skipping!')
         return releases
 
-    url = f'https://{dw}/{feed_type}'
+    url = f'https://{dt}/{feed_type}'
     headers = {'User-Agent': shared_state.values["user_agent"]}
 
     try:

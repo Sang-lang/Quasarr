@@ -31,7 +31,8 @@ class Config(object):
             ("dw", "secret", ""),
             ("fx", "secret", ""),
             ("nx", "secret", ""),
-            ("sf", "secret", "")
+            ("sf", "secret", ""),
+            ("sl", "secret", "")
         ],
         'DD': [
             ("user", "secret", ""),
