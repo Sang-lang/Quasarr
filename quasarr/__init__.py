@@ -17,6 +17,7 @@ import requests
 from quasarr.api import get_api
 from quasarr.providers import shared_state, version
 from quasarr.providers.log import info, debug
+from quasarr.providers.notifications import send_discord_message
 from quasarr.storage.config import Config, get_clean_hostnames
 from quasarr.storage.setup import path_config, hostnames_config, hostname_credentials_config, jdownloader_config
 from quasarr.storage.sqlite_database import DataBase
@@ -213,7 +214,7 @@ def run():
         jdownloader.start()
 
         updater = multiprocessing.Process(
-            target=update_checker_connection,
+            target=update_checker,
             args=(shared_state_dict, shared_state_lock)
         )
         updater.start()
@@ -226,21 +227,29 @@ def run():
             sys.exit(0)
 
 
-def update_checker_connection(shared_state_dict, shared_state_lock):
+def update_checker(shared_state_dict, shared_state_lock):
     shared_state.set_state(shared_state_dict, shared_state_lock)
+
+    message = "!!! UPDATE AVAILABLE !!!"
+    link = "https://github.com/rix1337/Quasarr/releases/latest"
 
     while True:
         try:
             update_available = version.newer_version_available()
         except Exception as e:
             info(f"Error getting latest version: {e}")
-            info('Please manually check: "https://github.com/rix1337/Quasarr/releases/" for more information!')
+            info(f'Please manually check: "{link}" for more information!')
             update_available = None
 
         if update_available:
-            info("!!! UPDATE AVAILABLE !!!")
-            info(f"Please update to the latest version: {update_available} as soon as possible!")
-            info('Release notes at: "https://github.com/rix1337/Quasarr/releases/"')
+            info(message)
+            info(f"Please update to {update_available} as soon as possible!")
+            info(f'Release notes at: "{link}"')
+            update_available = {
+                "version": update_available,
+                "link": link
+            }
+            send_discord_message(shared_state, message, "quasarr_update", details=update_available)
 
         # wait one hour before next check
         time.sleep(60 * 60)
