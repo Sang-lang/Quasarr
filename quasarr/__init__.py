@@ -49,6 +49,17 @@ def run():
 
         print("\n===== Startup Info =====")
 
+        try:
+            update_available = version.newer_version_available()
+        except Exception as e:
+            print(f"Error getting latest version: {str(e)}")
+            print('Please manually check: "https://github.com/rix1337/Quasarr/releases/" for more information!')
+            update_available = None
+        if update_available:
+            print("!!! UPDATE AVAILABLE !!!")
+            print(f"Please update to the latest version: {update_available} as soon as possible!")
+            print('Release notes at: "https://github.com/rix1337/Quasarr/releases/"')
+
         port = int('8080')
 
         config_path = ""
