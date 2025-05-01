@@ -40,8 +40,25 @@ def get_api(shared_state_dict, shared_state_lock):
         <h1><img src="https://raw.githubusercontent.com/rix1337/Quasarr/main/Quasarr.png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
         {captcha_hint}
         <h2>Setup Instructions</h2>
-        <p>Use this exact URL as <small>Newznab Indexer</small> and <small>SABnzbd Download Client</small> in Radarr/Sonarr:</p>
-        <code class=\"inline-code\">{shared_state.values['internal_address']}</code>
+        <p>Use these to set up a <strong>Newznab Indexer</strong> and <strong>SABnzbd Download Client</strong> in Radarr/Sonarr:</p>
+        
+        <h3>URL</h3>
+        <div class="url-wrapper">
+          <input id="urlInput" class="url-input" type="text" readonly value="{shared_state.values['internal_address']}" />
+          <button id="copyUrl" class="btn-primary small">Copy</button>
+        </div>
+        
+        <script>
+          const urlInput = document.getElementById('urlInput');
+          const copyUrlBtn = document.getElementById('copyUrl');
+        
+          copyUrlBtn.onclick = () => {{
+            urlInput.select();
+            document.execCommand('copy');
+            copyUrlBtn.innerText = 'Copied!';
+            setTimeout(() => {{ copyUrlBtn.innerText = 'Copy'; }}, 2000);
+          }};
+        </script>
 
         <h3>API Key</h3>
         <div class=\"api-key-wrapper\">
