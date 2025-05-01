@@ -30,17 +30,36 @@ def get_api(shared_state_dict, shared_state_lock):
         captcha_hint = ""
         if protected:
             plural = 's' if len(protected) > 1 else ''
-            captcha_hint = f"""
-            <h2>Protected link{plural} found</h2>
+            captcha_hint += f"""
+            <h2>Link{plural} waiting for CAPTCHA solution</h2>
+            """
+
+            if not shared_state.values.get("helper_active"):
+                captcha_hint += f"""
+                <p>
+                    <a href="https://github.com/users/rix1337/sponsorship" target="_blank">
+                        Become a Sponsor and let SponsorsHelper solve CAPTCHAs for you!
+                    </a>
+                </p>
+                """
+
+            plural = 's' if len(protected) > 1 else ''
+            captcha_hint += f"""
             <p>{render_button(f"Solve CAPTCHA{plural}", 'primary', {'onclick': "location.href='/captcha'"})}</p>
-            <a href="https://github.com/users/rix1337/sponsorship" target="_blank">For automated CAPTCHA solutions, use SponsorsHelper!</a>
             """
 
         info = f"""
         <h1><img src="https://raw.githubusercontent.com/rix1337/Quasarr/main/Quasarr.png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
         {captcha_hint}
         <h2>Setup Instructions</h2>
-        <p>Use these to set up a <strong>Newznab Indexer</strong> and <strong>SABnzbd Download Client</strong> in Radarr/Sonarr:</p>
+        <p>
+        <a href="https://github.com/rix1337/Quasarr?tab=readme-ov-file#instructions" target="_blank">
+            Refer to the README for detailed instructions.
+        </a>
+        <br>
+            Use the <strong>URL</strong> and <strong>API Key</strong> to set up
+            a <strong>Newznab Indexer</strong> and <strong>SABnzbd Download Client</strong> in Radarr/Sonarr:
+        </p>
         
         <h3>URL</h3>
         <div class="url-wrapper">
