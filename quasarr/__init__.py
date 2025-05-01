@@ -48,20 +48,7 @@ def run():
         print('For convenient universal premium downloads use: "https://linksnappy.com/?ref=397097"')
 
         print("\n===== Startup Info =====")
-
-        try:
-            update_available = version.newer_version_available()
-        except Exception as e:
-            print(f"Error getting latest version: {str(e)}")
-            print('Please manually check: "https://github.com/rix1337/Quasarr/releases/" for more information!')
-            update_available = None
-        if update_available:
-            print("!!! UPDATE AVAILABLE !!!")
-            print(f"Please update to the latest version: {update_available} as soon as possible!")
-            print('Release notes at: "https://github.com/rix1337/Quasarr/releases/"')
-
         port = int('8080')
-
         config_path = ""
         if os.environ.get('DOCKER'):
             config_path = "/config"
@@ -201,10 +188,6 @@ def run():
             print("No Discord Webhook URL provided")
         shared_state.update("discord", discord_url)
 
-        jdownloader = multiprocessing.Process(target=jdownloader_connection,
-                                              args=(shared_state_dict, shared_state_lock))
-        jdownloader.start()
-
         print("\n===== API Information =====")
         print('Setup instructions: "https://github.com/rix1337/Quasarr?tab=readme-ov-file#instructions".')
         print(f'URL: "{shared_state.values['internal_address']}"')
@@ -212,7 +195,6 @@ def run():
 
         if external_address != internal_address:
             print(f'External URL: "{shared_state.values["external_address"]}"')
-
 
         print("\n===== Quasarr Info Log =====")
         if os.getenv('DEBUG'):
@@ -224,10 +206,44 @@ def run():
             info(f'CAPTCHA-Solution required for {package_count} package{'s' if package_count > 1 else ''} at: '
                  f'"{shared_state.values["external_address"]}/captcha"!')
 
+        jdownloader = multiprocessing.Process(
+            target=jdownloader_connection,
+            args=(shared_state_dict, shared_state_lock)
+        )
+        jdownloader.start()
+
+        updater = multiprocessing.Process(
+            target=update_checker_connection,
+            args=(shared_state_dict, shared_state_lock)
+        )
+        updater.start()
+
         try:
             get_api(shared_state_dict, shared_state_lock)
         except KeyboardInterrupt:
+            jdownloader.kill()
+            updater.kill()
             sys.exit(0)
+
+
+def update_checker_connection(shared_state_dict, shared_state_lock):
+    shared_state.set_state(shared_state_dict, shared_state_lock)
+
+    while True:
+        try:
+            update_available = version.newer_version_available()
+        except Exception as e:
+            info(f"Error getting latest version: {e}")
+            info('Please manually check: "https://github.com/rix1337/Quasarr/releases/" for more information!')
+            update_available = None
+
+        if update_available:
+            info("!!! UPDATE AVAILABLE !!!")
+            info(f"Please update to the latest version: {update_available} as soon as possible!")
+            info('Release notes at: "https://github.com/rix1337/Quasarr/releases/"')
+
+        # wait one hour before next check
+        time.sleep(60 * 60)
 
 
 def jdownloader_connection(shared_state_dict, shared_state_lock):
