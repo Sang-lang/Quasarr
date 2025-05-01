@@ -27,11 +27,13 @@ Quasarr will confidently handle the rest.
     * Quasarr will become available once at least one suitable hostname is set.
 * Provide your [My-JDownloader-Credentials](https://my.jdownloader.org)
     * Consider setting up a fresh JDownloader before you begin.
+    * JDownloader must be running and available to Quasarr.
     * Quasarr will modify the settings of JDownloader so downloads can be properly handled by Radarr/Sonarr.
     * If using docker, make extra sure that JDownloader's download path is available to Radarr/Sonarr with the exact same
       internal and external path mapping. Just matching the external path is not enough.
 * Set up Quasarr as `Newznab Indexer` and `SABnzbd Download Client` in Radarr/Sonarr
-    * Use the API key from the console output (or copy it from the Quasarr web UI)
+    * Use the `URL` from the `API Information` section of the console output (or copy it from the Quasarr web UI)
+    * Use the `API Key` from the `API Information` section of the console output (or copy it from the Quasarr web UI)
     * Leave all other settings by default.
     * If you prefer to only get releases for a specific mirror, add the mirror name to the
       API path in the advanced indexer settings.
@@ -55,18 +57,20 @@ docker run -d \
   -e 'EXTERNAL_ADDRESS'='https://foo.bar/' \
   -e 'DISCORD'='https://discord.com/api/webhooks/1234567890/ABCDEFGHIJKLMN' \
   -e 'HOSTNAMES'='https://pastebin.com/raw/eX4Mpl3'
+  -e 'SILENT'='True' \
+  -e 'DEBUG'='' \
   ghcr.io/rix1337/quasarr:latest
   ```
 
 * `INTERNAL_ADDRESS` is required so Radarr/Sonarr can reach Quasarr. **Must** include port!
-* `EXTERNAL_ADDRESS` is optional and used in Discord notifications.
-* `DISCORD` is optional and must be a valid Discord Webhook URL.
+* `EXTERNAL_ADDRESS` is optional and helpful if using a reverse proxy. Always protect external access with basic auth!
+* `DISCORD` is optional and must be a valid Discord webhook URL.
 * `HOSTNAMES` is optional and allows skipping the manual hostname step during setup.
     * Must be a publicly available `HTTP` or `HTTPs` link
     * Must be a raw `.ini` / text file (not HTML or JSON)
     * Must contain at least one valid Hostname per line `ab = xyz`
-* `SILENT` is optional and silences all discord notifications except for error messages from SponsorsHelper.
-* `DEBUG` is optional and enables debug logging. **Only use to create a GitHub issue!**
+* `SILENT` is optional and silences all discord notifications except for error messages from SponsorsHelper if `True`.
+* `DEBUG` is optional and enables debug logging if `True`.
 
 # Manual setup
 
@@ -89,47 +93,37 @@ Use this only in case you can't run the docker image.
 
 # Philosophy
 
-Complexity is the killer of solo projects like this one. It must be fought at all cost!
+Complexity is the killer of small projects like this one. It must be fought at all cost!
 
-Therefore, feature toggles to modify Quasarr's behavior will never be introduced to this project.
+We will not waste precious time on features that will slow future development cycles down.
+It is by choice, that you will not find settings or filtering options in Quasarr.
 
-Consider that every choice for the user must be reflected throughout the project.
-Every feature toggle, therefore, is a negative multiplier for future development efforts.
-This project's predecessor [FeedCrawler](https://github.com/rix1337/FeedCrawler) died because it allowed an insane
-amount of flexibility.
+Most feature requests can be satisfied by:
+- Existing settings in Radarr/Sonarr
+- Existing settings in JDownloader
+- Existing tools from the *arr ecosystem that integrate directly with Radarr/Sonarr
 
-I will not waste my precious time on features that will slow future development cycles down.
-Issues, feature and pull requests that are meant to introduce feature toggles will therefore be rejected.
-
-## Intentional design decisions
-* There is no settings UI after the initial setup.
-  If you need to update hostnames or My-JDownloader-Credentials, simply delete the `Quasarr.ini` and restart Quasarr.
-* Radarr and Sonarr provide custom formats to automatically choose the most fitting release for a given search
-  based on the release's title. Quasarr prefixes release titles with the source hostname in square brackets in case you
-  want to apply custom format scores to certain hostnames.
+If you want to edit the hostname selection after the initial setup, you can do so by editing or deleting `Quasarr.ini`.
 
 # Roadmap
 
 - Assume there are zero known
   issues [unless you find one or more open issues in this repository](https://github.com/rix1337/Quasarr/issues).
 - Still having an issue? Provide a detailed report [here](https://github.com/rix1337/Quasarr/issues/new/choose)!
-- The feature set is considered complete. Most feature requests can be satisfied by:
-    - Existing settings in Radarr/Sonarr
-    - Existing settings in JDownloader
-    - Existing tools from the *arr ecosystem that integrate directly with Radarr/Sonarr
-- There are no hostname integrations in active development.
-- **Adding additional hostnames focused on English content is highly desired. Please send your pull requests!**
+- There are no hostname integrations in active development unless you see an open pull request 
+  [here](https://github.com/rix1337/Quasarr/pulls).
 - Pull requests are welcome. Especially for popular hostnames.
-    - Always reach out on Discord before starting work on a new feature.
+    - Always reach out on Discord before starting work on a new feature to prevent waste of time.
     - Please follow the existing code style and project structure.
-    - Anti-bot measures must be circumvented without relying on third party tools like Flaresolverr.
+    - Anti-bot measures must be circumvented fully by Quasarr. Thus you will need to provide a working solution for new
+      CAPTCHA types by integrating it in the Quasarr Web UI.
     - Please provide proof of functionality (screenshots/examples) when submitting your pull request.
 
 ## Development Setup for Pull Requests
 
 To test your changes before submitting a pull request:
 
-### 1. Run Quasarr with the `--internal_address` parameter
+**Run Quasarr with the `--internal_address` parameter:**
 
 ```bash
 python Quasarr.py --internal_address=http://<host-ip>:<port>
@@ -138,7 +132,7 @@ python Quasarr.py --internal_address=http://<host-ip>:<port>
 Replace `<host-ip>` and `<port>` with the scheme, IP, and port of your host machine.
 The `--internal_address` parameter is **mandatory**.
 
-### 2. Start the required services using the `dev-services-compose.yml` file
+**Start the required services using the `dev-services-compose.yml` file:**
 
 ```bash
 CONFIG_VOLUMES=/path/to/config docker-compose -f docker/dev-services-compose.yml up

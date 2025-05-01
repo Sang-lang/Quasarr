@@ -44,7 +44,7 @@ def get_api(shared_state_dict, shared_state_lock):
         
         <h3>URL</h3>
         <div class="url-wrapper">
-          <input id="urlInput" class="url-input" type="text" readonly value="{shared_state.values['internal_address']}" />
+          <input id="urlInput" class="copy-input" type="text" readonly value="{shared_state.values['internal_address']}" />
           <button id="copyUrl" class="btn-primary small">Copy</button>
         </div>
         
@@ -61,10 +61,10 @@ def get_api(shared_state_dict, shared_state_lock):
         </script>
 
         <h3>API Key</h3>
-        <div class=\"api-key-wrapper\">
-          <input id=\"apiKeyInput\" class=\"api-key-input\" type=\"password\" readonly value=\"{api_key}\" />
-          <button id=\"toggleKey\" class=\"btn-secondary small\">Show</button>
-          <button id=\"copyKey\" class=\"btn-primary small\">Copy</button>
+        <div class="api-key-wrapper">
+          <input id="apiKeyInput" class="copy-input" type="password" readonly value="{api_key}" />
+          <button id="toggleKey" class="btn-secondary small">Show</button>
+          <button id="copyKey" class="btn-primary small">Copy</button>
         </div>
 
         <p>{render_button("Regenerate API key", "secondary", {"onclick": "if(confirm('Regenerate API key?')) location.href='/regenerate-api-key';"})}</p>

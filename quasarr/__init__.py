@@ -17,6 +17,7 @@ import requests
 from quasarr.api import get_api
 from quasarr.providers import shared_state, version
 from quasarr.providers.log import info, debug
+from quasarr.providers.notifications import send_discord_message
 from quasarr.storage.config import Config, get_clean_hostnames
 from quasarr.storage.setup import path_config, hostnames_config, hostname_credentials_config, jdownloader_config
 from quasarr.storage.sqlite_database import DataBase
@@ -44,24 +45,11 @@ def run():
 └────────────────────────────────────┘""")
 
         print("\n===== Recommended Services =====")
-        print('- For automated CAPTCHA solutions use SponsorsHelper: "https://github.com/users/rix1337/sponsorship"')
-        print('- For convenient universal premium downloads use: "https://linksnappy.com/?ref=397097"')
+        print('For automated CAPTCHA solutions use SponsorsHelper: "https://github.com/users/rix1337/sponsorship"')
+        print('For convenient universal premium downloads use: "https://linksnappy.com/?ref=397097"')
 
         print("\n===== Startup Info =====")
-
-        try:
-            update_available = version.newer_version_available()
-        except Exception as e:
-            print(f"Error getting latest version: {str(e)}")
-            print('Please manually check: "https://github.com/rix1337/Quasarr/releases/" for more information!')
-            update_available = None
-        if update_available:
-            print("!!! UPDATE AVAILABLE !!!")
-            print(f"Please update to the latest version: {update_available} as soon as possible!")
-            print('Release notes at: "https://github.com/rix1337/Quasarr/releases/"')
-
         port = int('8080')
-
         config_path = ""
         if os.environ.get('DOCKER'):
             config_path = "/config"
@@ -163,7 +151,7 @@ def run():
             hostnames_config(shared_state)
             hostnames = get_clean_hostnames(shared_state)
         print(f"You have [{len(hostnames)} of {len(Config._DEFAULT_CONFIG['Hostnames'])}] supported hostnames set up")
-        print(f"For efficiency it is recommended to set up as few hostnames as needed.\n")
+        print(f"For efficiency it is recommended to set up as few hostnames as needed.")
 
         dd = Config('Hostnames').get('dd')
         if dd:
@@ -187,6 +175,7 @@ def run():
         if not user or not password or not device:
             jdownloader_config(shared_state)
 
+        print("\n===== Notifications =====")
         discord_url = ""
         if arguments.discord:
             discord_webhook_pattern = r'^https://discord\.com/api/webhooks/\d+/[\w-]+$'
@@ -200,17 +189,13 @@ def run():
             print("No Discord Webhook URL provided")
         shared_state.update("discord", discord_url)
 
-        jdownloader = multiprocessing.Process(target=jdownloader_connection,
-                                              args=(shared_state_dict, shared_state_lock))
-        jdownloader.start()
-
         print("\n===== API Information =====")
-        print(f'Quasarr API now running at: "{shared_state.values['external_address']}"')
-        print('Use the above URL to set up a "Newznab Indexer" and "SABnzbd Download Client" in Radarr/Sonarr')
-        print(f'Leave all settings at default and use this API key: "{api_key}" (without quotes)')
-        print(
-            'Optionally set one desired mirror in "API Path" at the advanced indexer settings, e.g. "/api/dropbox/" instead of "/api/"')
-        print('For more details, check https://github.com/rix1337/Quasarr?tab=readme-ov-file#instructions.')
+        print('Setup instructions: "https://github.com/rix1337/Quasarr?tab=readme-ov-file#instructions".')
+        print(f'URL: "{shared_state.values['internal_address']}"')
+        print(f'API key: "{api_key}" (without quotes)')
+
+        if external_address != internal_address:
+            print(f'External URL: "{shared_state.values["external_address"]}"')
 
         print("\n===== Quasarr Info Log =====")
         if os.getenv('DEBUG'):
@@ -222,10 +207,52 @@ def run():
             info(f'CAPTCHA-Solution required for {package_count} package{'s' if package_count > 1 else ''} at: '
                  f'"{shared_state.values["external_address"]}/captcha"!')
 
+        jdownloader = multiprocessing.Process(
+            target=jdownloader_connection,
+            args=(shared_state_dict, shared_state_lock)
+        )
+        jdownloader.start()
+
+        updater = multiprocessing.Process(
+            target=update_checker,
+            args=(shared_state_dict, shared_state_lock)
+        )
+        updater.start()
+
         try:
             get_api(shared_state_dict, shared_state_lock)
         except KeyboardInterrupt:
+            jdownloader.kill()
+            updater.kill()
             sys.exit(0)
+
+
+def update_checker(shared_state_dict, shared_state_lock):
+    shared_state.set_state(shared_state_dict, shared_state_lock)
+
+    message = "!!! UPDATE AVAILABLE !!!"
+    link = "https://github.com/rix1337/Quasarr/releases/latest"
+
+    while True:
+        try:
+            update_available = version.newer_version_available()
+        except Exception as e:
+            info(f"Error getting latest version: {e}")
+            info(f'Please manually check: "{link}" for more information!')
+            update_available = None
+
+        if update_available:
+            info(message)
+            info(f"Please update to {update_available} as soon as possible!")
+            info(f'Release notes at: "{link}"')
+            update_available = {
+                "version": update_available,
+                "link": link
+            }
+            send_discord_message(shared_state, message, "quasarr_update", details=update_available)
+
+        # wait one hour before next check
+        time.sleep(60 * 60)
 
 
 def jdownloader_connection(shared_state_dict, shared_state_lock):

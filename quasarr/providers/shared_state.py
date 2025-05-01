@@ -50,7 +50,7 @@ def set_files(config_path):
 
 
 def generate_api_key():
-    api_key = os.urandom(24).hex()
+    api_key = os.urandom(32).hex()
     Config('API').save("key", api_key)
     info(f'API key replaced with: "{api_key}!"')
     return api_key
@@ -64,7 +64,10 @@ def extract_valid_hostname(url, shorthand):
         result = parse.urlparse(url)
         domain = result.netloc
 
-        # Check if both characters in the shorthand are in the domain
+        if not "." in domain:
+            print(f'Invalid domain "{domain}": No "." found')
+            return None
+
         if all(char in domain for char in shorthand):
             print(f'"{domain}" matches both characters from "{shorthand}". Continuing...')
             return domain

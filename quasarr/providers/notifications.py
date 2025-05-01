@@ -19,7 +19,7 @@ if os.getenv('SILENT'):
     silent = True
 
 
-def send_discord_message(shared_state, title, case, imdb_id=None):
+def send_discord_message(shared_state, title, case, imdb_id=None, details=None):
     """
     Sends a Discord message to the webhook provided in the shared state, based on the specified case.
 
@@ -64,8 +64,19 @@ def send_discord_message(shared_state, title, case, imdb_id=None):
         if not shared_state.values.get("helper_active"):
             fields.append({
                 'name': 'SponsorsHelper',
-                'value': f'[Become a Sponsor and let SponsorsHelper solve CAPTCHAs for you!]({f"https://github.com/users/rix1337/sponsorship"})',
+                'value': f'[Become a Sponsor and let SponsorsHelper solve CAPTCHAs for you!]("https://github.com/users/rix1337/sponsorship")',
             }, )
+    elif case == "quasarr_update":
+        description = f'Please update to {details["version"]} as soon as possible!'
+        if details:
+            fields = [
+                {
+                    'name': 'Release notes at: ',
+                    'value': f'[GitHub.com: rix1337/Quasarr/{details["version"]}]({details["link"]})',
+                }
+            ]
+        else:
+            fields = None
     else:
         info(f"Unknown notification case: {case}")
         return False
@@ -85,9 +96,13 @@ def send_discord_message(shared_state, title, case, imdb_id=None):
     if poster_object:
         data['embeds'][0]['thumbnail'] = poster_object
         data['embeds'][0]['image'] = poster_object
+    elif case == "quasarr_update":
+        data['embeds'][0]['thumbnail'] = {
+            'url': "https://raw.githubusercontent.com/rix1337/Quasarr/main/Quasarr.png"
+        }
 
     # Apply silent mode: suppress notifications for all cases except 'deleted'
-    if silent and case != "failed":
+    if silent and case not in ["failed", "quasarr_update"]:
         data['flags'] = SUPPRESS_NOTIFICATIONS
 
     response = requests.post(shared_state.values["discord"], data=json.dumps(data),

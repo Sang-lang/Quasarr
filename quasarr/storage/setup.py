@@ -179,10 +179,12 @@ def jdownloader_config(shared_state):
     app = Bottle()
 
     @app.get('/')
-    def hostname_form():
+    def jd_form():
         verify_form_html = f'''
         <span>If required register account at: <a href="https://my.jdownloader.org/login.html#register">
-        my.jdownloader.org</a>!</span><br><br>
+        my.jdownloader.org</a>!</span><br>
+        
+        <p><strong>JDownloader must be running and connected to My JDownloader!</strong></p><br>
         
         <form id="verifyForm" action="/api/verify_jdownloader" method="post">
             <label for="user">E-Mail</label>
@@ -203,6 +205,7 @@ def jdownloader_config(shared_state):
             <select id="device" name="device"></select><br>
             {render_button("Save", "primary", {"type": "submit"})}
         </form>
+        <p><strong>Saving may take a while!</strong></p><br>
         '''
 
         verify_script = '''
