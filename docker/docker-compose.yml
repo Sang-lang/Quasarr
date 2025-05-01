@@ -1,9 +1,8 @@
-version: '3.3'
 services:
     quasarr:
         container_name: 'Quasarr'
         ports:
-            - 'port:8080'
+            - '8080:8080'
         volumes:
             - '/path/to/config/:/config:rw'
         environment:
@@ -11,4 +10,6 @@ services:
             - 'EXTERNAL_ADDRESS=https://foo.bar/'
             - 'DISCORD=https://discord.com/api/webhooks/1234567890/ABCDEFGHIJKLMN'
             - 'EXTERNAL_ADDRESS=https://pastebin.com/raw/eX4Mpl3'
+            - 'SILENT=True'
+            - 'DEBUG='
         image: 'rix1337/docker-quasarr:latest'

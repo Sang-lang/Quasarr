@@ -44,8 +44,8 @@ def run():
 └────────────────────────────────────┘""")
 
         print("\n===== Recommended Services =====")
-        print('- For automated CAPTCHA solutions use SponsorsHelper: "https://github.com/users/rix1337/sponsorship"')
-        print('- For convenient universal premium downloads use: "https://linksnappy.com/?ref=397097"')
+        print('For automated CAPTCHA solutions use SponsorsHelper: "https://github.com/users/rix1337/sponsorship"')
+        print('For convenient universal premium downloads use: "https://linksnappy.com/?ref=397097"')
 
         print("\n===== Startup Info =====")
 
@@ -163,7 +163,7 @@ def run():
             hostnames_config(shared_state)
             hostnames = get_clean_hostnames(shared_state)
         print(f"You have [{len(hostnames)} of {len(Config._DEFAULT_CONFIG['Hostnames'])}] supported hostnames set up")
-        print(f"For efficiency it is recommended to set up as few hostnames as needed.\n")
+        print(f"For efficiency it is recommended to set up as few hostnames as needed.")
 
         dd = Config('Hostnames').get('dd')
         if dd:
@@ -187,6 +187,7 @@ def run():
         if not user or not password or not device:
             jdownloader_config(shared_state)
 
+        print("\n===== Notifications =====")
         discord_url = ""
         if arguments.discord:
             discord_webhook_pattern = r'^https://discord\.com/api/webhooks/\d+/[\w-]+$'
@@ -205,12 +206,13 @@ def run():
         jdownloader.start()
 
         print("\n===== API Information =====")
-        print(f'Quasarr API now running at: "{shared_state.values['external_address']}"')
-        print('Use the above URL to set up a "Newznab Indexer" and "SABnzbd Download Client" in Radarr/Sonarr')
-        print(f'Leave all settings at default and use this API key: "{api_key}" (without quotes)')
-        print(
-            'Optionally set one desired mirror in "API Path" at the advanced indexer settings, e.g. "/api/dropbox/" instead of "/api/"')
-        print('For more details, check https://github.com/rix1337/Quasarr?tab=readme-ov-file#instructions.')
+        print('Setup instructions: "https://github.com/rix1337/Quasarr?tab=readme-ov-file#instructions".')
+        print(f'URL: "{shared_state.values['internal_address']}"')
+        print(f'API key: "{api_key}" (without quotes)')
+
+        if external_address != internal_address:
+            print(f'External URL: "{shared_state.values["external_address"]}"')
+
 
         print("\n===== Quasarr Info Log =====")
         if os.getenv('DEBUG'):

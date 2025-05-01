@@ -10,38 +10,6 @@ def render_centered_html(inner_content):
         <title>Quasarr</title>
         <link rel="icon" href="https://raw.githubusercontent.com/rix1337/Quasarr/main/Quasarr.png">
         <style>
-            /* Logo and heading alignment */
-            h1 {
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                margin-bottom: 0.5rem;
-                font-size: 2rem;
-            }
-            .logo {
-                width: 48px;
-                height: 48px;
-                margin-right: 0.5rem;
-            }
-
-            /* Form labels and inputs */
-            label {
-                display: block;
-                font-weight: 600;
-                margin-bottom: 0.5rem;
-            }
-            input, select {
-                display: block;
-                width: 100%;
-                padding: 0.5rem;
-                font-size: 1rem;
-                border: 1px solid #ced4da;
-                border-radius: 0.5rem;
-                background-color: var(--card-bg);
-                color: var(--fg-color);
-                box-sizing: border-box;
-            }
-
             /* Theme variables */
             :root {
                 --bg-color: #ffffff;
@@ -61,6 +29,36 @@ def render_centered_html(inner_content):
                     --card-shadow: rgba(0, 0, 0, 0.5);
                     --code-bg: #2c2f33;
                 }
+            }
+            /* Logo and heading alignment */
+            h1 {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                margin-bottom: 0.5rem;
+                font-size: 2rem;
+            }
+            .logo {
+                width: 48px;
+                height: 48px;
+                margin-right: 0.5rem;
+            }
+            /* Form labels and inputs */
+            label {
+                display: block;
+                font-weight: 600;
+                margin-bottom: 0.5rem;
+            }
+            input, select {
+                display: block;
+                width: 100%;
+                padding: 0.5rem;
+                font-size: 1rem;
+                border: 1px solid #ced4da;
+                border-radius: 0.5rem;
+                background-color: var(--card-bg);
+                color: var(--fg-color);
+                box-sizing: border-box;
             }
             *, *::before, *::after {
                 box-sizing: border-box;
@@ -118,16 +116,10 @@ def render_centered_html(inner_content):
             p {
                 margin: 0.5rem 0;
             }
-            .inline-code, code {
-                display: block;
+            .copy-input {
                 background-color: var(--code-bg);
-                padding: 0.5rem;
-                border-radius: 0.5rem;
-                font-family: monospace;
-                word-break: break-all;
-                margin: var(--spacing) 0;
             }
-            .api-key-wrapper {
+            .url-wrapper .api-key-wrapper {
                 display: flex;
                 gap: 0.5rem;
                 flex-wrap: wrap;
