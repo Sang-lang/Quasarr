@@ -4,9 +4,68 @@
 
 import re
 
+import requests
+
 
 def get_version():
-    return "1.4.0"
+    return "1.4.1"
+
+
+def get_latest_version():
+    """
+    Query GitHub API for the latest release of the Quasarr repository.
+    Returns the tag name string (e.g. "1.5.0" or "1.4.2a1").
+    Raises RuntimeError on HTTP errors.
+    """
+    api_url = "https://api.github.com/repos/rix1337/Quasarr/releases/latest"
+    resp = requests.get(api_url, headers={"Accept": "application/vnd.github.v3+json"})
+    if resp.status_code != 200:
+        raise RuntimeError(f"GitHub API error: {resp.status_code} {resp.text}")
+    data = resp.json()
+    tag = data.get("tag_name") or data.get("name")
+    if not tag:
+        raise RuntimeError("Could not find tag_name in GitHub response")
+    return tag
+
+
+def _version_key(v):
+    """
+    Normalize a version string into a tuple for comparisons.
+    E.g. "1.4.2a3" -> (1, 4, 2, 'a', 3), "1.4.2" -> (1, 4, 2, '', 0)
+    """
+    m = re.match(r"^([0-9]+(?:\.[0-9]+)*)([a-z]?)([0-9]*)$", v)
+    if not m:
+        clean = re.sub(r"[^\d.]", "", v)
+        parts = clean.split(".")
+        nums = tuple(int(x) for x in parts if x.isdigit())
+        return nums + ("", 0)
+    base, alpha, num = m.groups()
+    nums = tuple(int(x) for x in base.split("."))
+    suffix_num = int(num) if num.isdigit() else 0
+    return nums + (alpha or "", suffix_num)
+
+
+def is_newer(latest, current):
+    """
+    Return True if latest > current using semantic+alpha comparison.
+    """
+    return _version_key(latest) > _version_key(current)
+
+
+def newer_version_available():
+    """
+    Check local vs. GitHub latest version.
+    Returns the latest version string if a newer release is available,
+    otherwise returns None.
+    """
+    try:
+        current = get_version()
+        latest = get_latest_version()
+    except:
+        raise
+    if is_newer(latest, current):
+        return latest
+    return None
 
 
 def create_version_file():

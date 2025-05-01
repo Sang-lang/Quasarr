@@ -39,7 +39,6 @@ def render_centered_html(inner_content):
                 border-radius: 0.5rem;
                 background-color: var(--card-bg);
                 color: var(--fg-color);
-                margin-bottom: 1rem;
                 box-sizing: border-box;
             }
 
@@ -93,14 +92,14 @@ def render_centered_html(inner_content):
                 width: 100%;
                 max-width: fit-content;
             }
-            /* Media query for small screens (e.g., max-width: 600px) */
+            /* No padding on the sides for captcha view on small screens */
             @media (max-width: 600px) {
-                .outer {
+                body:has(iframe) .outer {
                     padding-left: 0;
                     padding-right: 0;
                 }
             
-                .inner {
+                body:has(iframe) .inner {
                     padding-left: 0;
                     padding-right: 0;
                 }
@@ -155,10 +154,6 @@ def render_centered_html(inner_content):
             .btn-secondary {
                 background-color: var(--secondary);
                 color: #fff;
-            }
-            .small {
-                font-size: 0.875rem;
-                padding: 0.25rem 0.5rem;
             }
             a {
                 color: var(--primary);
