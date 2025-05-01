@@ -78,6 +78,11 @@ def get_links_status(package, all_links):
 def get_links_matching_package_uuid(package, package_links):
     package_uuid = package.get("uuid")
     link_ids = []
+
+    if not isinstance(package_links, list):
+        debug("Error - expected a list of package_links, got: %r" % type(package_links).__name__)
+        return link_ids
+
     if package_uuid:
         for link in package_links:
             if link.get("packageUUID") == package_uuid:
