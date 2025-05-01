@@ -228,73 +228,80 @@ def run():
 
 
 def update_checker(shared_state_dict, shared_state_lock):
-    shared_state.set_state(shared_state_dict, shared_state_lock)
+    try:
+        shared_state.set_state(shared_state_dict, shared_state_lock)
 
-    message = "!!! UPDATE AVAILABLE !!!"
-    link = "https://github.com/rix1337/Quasarr/releases/latest"
+        message = "!!! UPDATE AVAILABLE !!!"
+        link = "https://github.com/rix1337/Quasarr/releases/latest"
 
-    shared_state.update("last_checked_version", f"v.{version.get_version()}")
+        shared_state.update("last_checked_version", f"v.{version.get_version()}")
 
-    while True:
-        try:
-            update_available = version.newer_version_available()
-        except Exception as e:
-            info(f"Error getting latest version: {e}")
-            info(f'Please manually check: "{link}" for more information!')
-            update_available = None
+        while True:
+            try:
+                update_available = version.newer_version_available()
+            except Exception as e:
+                info(f"Error getting latest version: {e}")
+                info(f'Please manually check: "{link}" for more information!')
+                update_available = None
 
-        if update_available and shared_state.values["last_checked_version"] != update_available:
-            shared_state.update("last_checked_version", update_available)
-            info(message)
-            info(f"Please update to {update_available} as soon as possible!")
-            info(f'Release notes at: "{link}"')
-            update_available = {
-                "version": update_available,
-                "link": link
-            }
-            send_discord_message(shared_state, message, "quasarr_update", details=update_available)
+            if update_available and shared_state.values["last_checked_version"] != update_available:
+                shared_state.update("last_checked_version", update_available)
+                info(message)
+                info(f"Please update to {update_available} as soon as possible!")
+                info(f'Release notes at: "{link}"')
+                update_available = {
+                    "version": update_available,
+                    "link": link
+                }
+                send_discord_message(shared_state, message, "quasarr_update", details=update_available)
 
-        # wait one hour before next check
-        time.sleep(60 * 60)
+            # wait one hour before next check
+            time.sleep(60 * 60)
+    except KeyboardInterrupt:
+        pass
 
 
 def jdownloader_connection(shared_state_dict, shared_state_lock):
-    shared_state.set_state(shared_state_dict, shared_state_lock)
-
-    shared_state.set_device_from_config()
-
-    connection_established = shared_state.get_device() and shared_state.get_device().name
-    if not connection_established:
-        i = 0
-        while i < 10:
-            i += 1
-            info(f'Connection {i} to JDownloader failed. Device name: "{shared_state.values["device"]}"')
-            time.sleep(60)
-            shared_state.set_device_from_config()
-            connection_established = shared_state.get_device() and shared_state.get_device().name
-            if connection_established:
-                break
-
     try:
-        info(f'Connection to JDownloader successful. Device name: "{shared_state.get_device().name}"')
-    except Exception as e:
-        info(f'Error connecting to JDownloader: {e}! Stopping Quasarr!')
-        sys.exit(1)
+        shared_state.set_state(shared_state_dict, shared_state_lock)
 
-    try:
-        shared_state.set_device_settings()
-    except Exception as e:
-        print(f"Error checking settings: {e}")
+        shared_state.set_device_from_config()
 
-    try:
-        shared_state.update_jdownloader()
-    except Exception as e:
-        print(f"Error updating JDownloader: {e}")
+        connection_established = shared_state.get_device() and shared_state.get_device().name
+        if not connection_established:
+            i = 0
+            while i < 10:
+                i += 1
+                info(f'Connection {i} to JDownloader failed. Device name: "{shared_state.values["device"]}"')
+                time.sleep(60)
+                shared_state.set_device_from_config()
+                connection_established = shared_state.get_device() and shared_state.get_device().name
+                if connection_established:
+                    break
 
-    try:
-        shared_state.start_downloads()
-    except Exception as e:
-        print(f"Error starting downloads: {e}")
+        try:
+            info(f'Connection to JDownloader successful. Device name: "{shared_state.get_device().name}"')
+        except Exception as e:
+            info(f'Error connecting to JDownloader: {e}! Stopping Quasarr!')
+            sys.exit(1)
+
+        try:
+            shared_state.set_device_settings()
+        except Exception as e:
+            print(f"Error checking settings: {e}")
+
+        try:
+            shared_state.update_jdownloader()
+        except Exception as e:
+            print(f"Error updating JDownloader: {e}")
+
+        try:
+            shared_state.start_downloads()
+        except Exception as e:
+            print(f"Error starting downloads: {e}")
+
+    except KeyboardInterrupt:
+        pass
 
 
 class Unbuffered(object):
