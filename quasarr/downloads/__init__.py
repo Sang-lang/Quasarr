@@ -11,6 +11,7 @@ from quasarr.downloads.sources.dt import get_dt_download_links
 from quasarr.downloads.sources.dw import get_dw_download_links
 from quasarr.downloads.sources.nx import get_nx_download_links
 from quasarr.downloads.sources.sf import get_sf_download_links, resolve_sf_redirect
+from quasarr.downloads.sources.sl import get_sl_download_links
 from quasarr.providers.log import info, debug
 from quasarr.providers.myjd_api import TokenExpiredException, RequestTimeoutException, MYJDException
 from quasarr.providers.notifications import send_discord_message
@@ -347,7 +348,7 @@ def get_packages(shared_state):
 
         for package in linkgrabber_packages:
             comment = get_links_comment(package, shared_state.get_device().linkgrabber.query_links())
-            if comment.startswith("Quasarr_"):
+            if comment and comment.startswith("Quasarr_"):
                 package_uuid = package.get("uuid")
                 if package_uuid:
                     linkgrabber_links = [link.get("uuid") for link in linkgrabber_links if
@@ -444,6 +445,7 @@ def download(shared_state, request_from, title, url, mirror, size_mb, password, 
     dw = shared_state.values["config"]("Hostnames").get("dw")
     nx = shared_state.values["config"]("Hostnames").get("nx")
     sf = shared_state.values["config"]("Hostnames").get("sf")
+    sl = shared_state.values["config"]("Hostnames").get("sl")
 
     if dd and dd.lower() in url.lower():
         links = get_dd_download_links(shared_state, mirror, title)
@@ -455,7 +457,7 @@ def download(shared_state, request_from, title, url, mirror, size_mb, password, 
                 info(f"Failed to add {title} to linkgrabber")
                 package_id = None
         else:
-            info(f"Found 0 links decrypting {title}")
+            info(f"Found 0 links decrypting {title} on DD")
             package_id = None
 
     elif dt and dt.lower() in url.lower():
@@ -468,7 +470,7 @@ def download(shared_state, request_from, title, url, mirror, size_mb, password, 
                 info(f"Failed to add {title} to linkgrabber")
                 package_id = None
         else:
-            info(f"Found 0 links decrypting {title}")
+            info(f"Found 0 links decrypting {title} on DT")
             package_id = None
 
 
@@ -489,7 +491,7 @@ def download(shared_state, request_from, title, url, mirror, size_mb, password, 
                 info(f"Failed to add {title} to linkgrabber")
                 package_id = None
         else:
-            info(f"Found 0 links decrypting {title}")
+            info(f"Found 0 links decrypting {title} on NX")
             package_id = None
 
     elif sf and sf.lower() in url.lower():
@@ -507,6 +509,19 @@ def download(shared_state, request_from, title, url, mirror, size_mb, password, 
             shared_state.values["database"]("protected").update_store(package_id, blob)
         else:
             info(f"Failed to get download link from SF for {title} - {url}")
+            package_id = None
+
+    elif sl and sl.lower() in url.lower():
+        links = get_sl_download_links(shared_state, url, mirror, title)
+        if links:
+            info(f"Decrypted {len(links)} download links for {title}")
+            send_discord_message(shared_state, title=title, case="unprotected", imdb_id=imdb_id)
+            added = shared_state.download_package(links, title, password, package_id)
+            if not added:
+                info(f"Failed to add {title} to linkgrabber")
+                package_id = None
+        else:
+            info(f"Found 0 links decrypting {title} on SL")
             package_id = None
 
     elif "filecrypt".lower() in url.lower():

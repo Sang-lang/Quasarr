@@ -12,6 +12,7 @@ from quasarr.search.sources.dt import dt_feed, dt_search
 from quasarr.search.sources.fx import fx_feed, fx_search
 from quasarr.search.sources.nx import nx_feed, nx_search
 from quasarr.search.sources.sf import sf_feed, sf_search
+from quasarr.search.sources.sl import sl_feed, sl_search
 
 
 def get_search_results(shared_state, request_from, search_string="", mirror=None, season="", episode=""):
@@ -23,6 +24,7 @@ def get_search_results(shared_state, request_from, search_string="", mirror=None
     fx = shared_state.values["config"]("Hostnames").get("fx")
     nx = shared_state.values["config"]("Hostnames").get("nx")
     sf = shared_state.values["config"]("Hostnames").get("sf")
+    sl = shared_state.values["config"]("Hostnames").get("sl")
 
     start_time = time.time()
 
@@ -35,16 +37,18 @@ def get_search_results(shared_state, request_from, search_string="", mirror=None
 
         if dd:
             functions.append(lambda: dd_search(shared_state, start_time, search_string, mirror=mirror))
-        if dw:
-            functions.append(lambda: dw_search(shared_state, start_time, request_from, search_string, mirror=mirror))
         if dt:
             functions.append(lambda: dt_search(shared_state, start_time, request_from, search_string, mirror=mirror))
+        if dw:
+            functions.append(lambda: dw_search(shared_state, start_time, request_from, search_string, mirror=mirror))
         if fx:
             functions.append(lambda: fx_search(shared_state, start_time, search_string, mirror=mirror))
         if nx:
             functions.append(lambda: nx_search(shared_state, start_time, request_from, search_string, mirror=mirror))
         if sf:
             functions.append(lambda: sf_search(shared_state, start_time, request_from, search_string, mirror=mirror))
+        if sl:
+            functions.append(lambda: sl_search(shared_state, start_time, request_from, search_string, mirror=mirror))
     else:
         if dd:
             functions.append(lambda: dd_search(shared_state, start_time, mirror=mirror))
@@ -58,6 +62,8 @@ def get_search_results(shared_state, request_from, search_string="", mirror=None
             functions.append(lambda: nx_feed(shared_state, start_time, request_from, mirror=mirror))
         if sf:
             functions.append(lambda: sf_feed(shared_state, start_time, request_from, mirror=mirror))
+        if sl:
+            functions.append(lambda: sl_feed(shared_state, start_time, request_from, mirror=mirror))
 
     stype = f'search phrase "{search_string}"' if search_string else "feed search"
     info(f'Starting {len(functions)} search functions for {stype}... This may take some time.')

@@ -190,7 +190,7 @@ def run():
         shared_state.update("discord", discord_url)
 
         print("\n===== API Information =====")
-        print('Setup instructions: "https://github.com/rix1337/Quasarr?tab=readme-ov-file#instructions".')
+        print('Setup instructions: "https://github.com/rix1337/Quasarr?tab=readme-ov-file#instructions"')
         print(f'URL: "{shared_state.values['internal_address']}"')
         print(f'API key: "{api_key}" (without quotes)')
 
