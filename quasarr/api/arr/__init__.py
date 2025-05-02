@@ -15,7 +15,6 @@ from quasarr.downloads import download
 from quasarr.downloads.packages import get_packages, delete_package
 from quasarr.providers import shared_state
 from quasarr.providers.log import info, debug
-from quasarr.providers.tvmaze_metadata import get_title_from_tvrage_id
 from quasarr.search import get_search_results
 from quasarr.storage.config import Config
 
@@ -166,21 +165,32 @@ def setup_arr_routes(app):
                 mode = request.query.t
                 if mode == 'caps':
                     return '''<?xml version="1.0" encoding="UTF-8"?>
-                                    <caps>
-                                      <categories>
-                                          <category id="2000" name="Movies">
-                                          </category>
-                                          <category id="5000" name="TV">
-                                          </category>
-                                      </categories>
-                                    </caps>'''
+                                <caps>
+                                  <server 
+                                    version="1.33.7" 
+                                    title="Quasarr" 
+                                    url="https://quasarr.indexer/" 
+                                    email="support@quasarr.indexer" 
+                                  />
+                                  <limits max="100" default="100" />
+                                  <registration available="no" open="no" />
+                                  <searching>
+                                    <search available="yes" supportedParams="q" />
+                                    <tv-search available="yes" supportedParams="q,season,ep" />
+                                    <movie-search available="yes" supportedParams="imdbid" />
+                                  </searching>
+                                  <categories>
+                                    <category id="5000" name="TV" />
+                                    <category id="2000" name="Movies" />
+                                  </categories>
+                                </caps>'''
                 elif mode in ['movie', 'tvsearch', 'search']:
                     request_from = request.headers.get('User-Agent')
 
                     releases = []
 
                     if mode == 'movie':
-                        # only imdb is implemented
+                        # only imdbid is supported
                         search_param = f"tt{getattr(request.query, 'imdbid', '')}" \
                             if getattr(request.query, 'imdbid', '') else ""
 
@@ -193,14 +203,10 @@ def setup_arr_routes(app):
                         debug(f'Search in Anime-Order is not supported. Ignoring request: {dict(request.query)}')
 
                     elif mode == 'tvsearch':
+                        # only q, season and ep are supported
+                        search_param = getattr(request.query, 'q', "")
                         season = getattr(request.query, 'season', "")
                         episode = getattr(request.query, 'ep', "")
-                        # only plain search string and tvrage id is implemented
-                        search_param = getattr(request.query, 'q', "")
-                        if not search_param:
-                            tvrage_id = getattr(request.query, 'rid', "")
-                            if tvrage_id:
-                                search_param = get_title_from_tvrage_id(tvrage_id)
 
                         offset = getattr(request.query, 'offset', "")  # ignoring offset higher than 0 on purpose
                         if int(offset) == 0:
