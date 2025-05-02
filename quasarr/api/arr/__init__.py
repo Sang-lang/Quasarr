@@ -11,7 +11,8 @@ from xml.etree import ElementTree
 
 from bottle import abort, request
 
-from quasarr.downloads import download, delete_package, get_packages
+from quasarr.downloads import download
+from quasarr.downloads.packages import get_packages, delete_package
 from quasarr.providers import shared_state
 from quasarr.providers.log import info, debug
 from quasarr.providers.tvmaze_metadata import get_title_from_tvrage_id
@@ -86,7 +87,7 @@ def setup_arr_routes(app):
         api_type = 'arr_download_client' if request.query.mode else 'arr_indexer' if request.query.t else None
 
         if api_type == 'arr_download_client':
-            # This yields with a mock SABnzbd API response based on the My JDownloader integration
+            # This builds a mock SABnzbd API response based on the My JDownloader integration
             try:
                 mode = request.query.mode
                 if mode == "version":
@@ -157,7 +158,7 @@ def setup_arr_routes(app):
             }
 
         elif api_type == 'arr_indexer':
-            # this yields with a mock Newznab API response based on Quasarr search
+            # this builds a mock Newznab API response based on Quasarr search
             try:
                 if mirror:
                     debug(f'Search will only return releases that match this mirror: "{mirror}"')

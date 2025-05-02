@@ -12,4 +12,4 @@ services:
             - 'EXTERNAL_ADDRESS=https://pastebin.com/raw/eX4Mpl3'
             - 'SILENT=True'
             - 'DEBUG='
-        image: 'rix1337/docker-quasarr:latest'
+        image: 'ghcr.io/rix1337/quasarr:latest'
