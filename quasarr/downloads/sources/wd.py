@@ -56,14 +56,14 @@ def get_wd_download_links(
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
 
-        # extract IMDB id if present
+        # extract IMDb id if present
         imdb_id = None
         a_imdb = soup.find("a", href=re.compile(r"imdb\.com/title/tt\d+"))
         if a_imdb:
             m = re.search(r"(tt\d+)", a_imdb["href"])
             if m:
                 imdb_id = m.group(1)
-                debug(f"Found IMDB id: {imdb_id}")
+                debug(f"Found IMDb id: {imdb_id}")
 
         # find Downloads card
         header = soup.find(
@@ -121,4 +121,7 @@ def get_wd_download_links(
     except Exception:
         info(f"WD site has been updated. Parsing download links for {title} not possible!")
 
-    return results
+    return {
+        "links": results,
+        "imdb_id": imdb_id,
+    }

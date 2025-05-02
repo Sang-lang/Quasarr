@@ -119,7 +119,55 @@ If you want to edit the hostname selection after the initial setup, you can do s
       CAPTCHA types by integrating it in the Quasarr Web UI.
     - Please provide proof of functionality (screenshots/examples) when submitting your pull request.
 
-## Development Setup for Pull Requests
+
+# SponsorsHelper
+
+<img src="https://imgur.com/iHBqLwT.png" data-canonical-src="https://imgur.com/iHBqLwT.png" width="64" height="64" />
+
+The SponsorsHelper is a Docker image that automatically solves CAPTCHAs and decrypts links for Quasarr.
+
+[The process strictly requires an account token with credit at DeathByCaptcha](https://deathbycaptcha.com/register?refid=6184288242b).
+
+The image is only available to active [sponsors](https://github.com/users/rix1337/sponsorship) (hence the name).
+
+Access is automatically granted via GitHub: 
+
+[![Github Sponsorship](https://img.shields.io/badge/support-me-red.svg)](https://github.com/users/rix1337/sponsorship)
+
+## Docker Login
+
+### Generate GitHub Token
+
+1. Open the [GitHub token settings](https://github.com/settings/tokens/new)
+2. Select "New personal access token (classic)"
+3. Fill in the note, e.g., "SponsorsHelper"
+4. Enable the "read:packages" scope
+5. Create and use the token for login as "GITHUB_TOKEN"
+
+### Login
+
+`docker login https://ghcr.io  -u USERNAME -p GITHUB_TOKEN`
+
+**Without this login, it is not possible to download the image.**
+
+## Starting SponsorsHelper
+
+```
+docker run -d \
+    --name='SponsorsHelper' \
+    -e 'QUASARR_URL'='http://192.168.1.10:8080' \
+    -e 'DEATHBYCAPTCHA_TOKEN'='2FMum5zuDBxMmbXDIsADnllEFl73bomydIpzo7...' \
+    'ghcr.io/rix1337-sponsors/docker/helper:latest'
+```
+
+### Required Parameters
+
+- `-e 'QUASARR_URL'` The local URL of Quasarr - e.g., `http://192.168.0.1:8080`
+  (should match the `INTERNAL_ADDRESS` parameter from above)
+- `-e 'DEATHBYCAPTCHA_TOKEN'` The account token from [DeathByCaptcha](https://deathbycaptcha.com/register?refid=6184288242b) - e.g.,
+  `2FMum5zuDBxMmbXDIsADnllEFl73bomydIpzo7...aBc`
+
+# Development Setup for Pull Requests
 
 To test your changes before submitting a pull request:
 

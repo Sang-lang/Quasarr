@@ -85,7 +85,10 @@ def download(shared_state, request_from, title, url, mirror, size_mb, password, 
         if url.startswith(f"https://{sf}/external"):  # from interactive search
             url = resolve_sf_redirect(url, shared_state.values["user_agent"])
         elif url.startswith(f"https://{sf}/"):  # from feed search
-            url = get_sf_download_links(shared_state, url, mirror, title)
+            data = get_sf_download_links(shared_state, url, mirror, title)
+            url = data.get("real_url")
+            if not imdb_id:
+                imdb_id = data.get("imdb_id")
 
         if url:
             info(f'CAPTCHA-Solution required for "{title}" at: "{shared_state.values['external_address']}/captcha"')
@@ -99,7 +102,10 @@ def download(shared_state, request_from, title, url, mirror, size_mb, password, 
             package_id = None
 
     elif sl and sl.lower() in url.lower():
-        links = get_sl_download_links(shared_state, url, mirror, title)
+        data = get_sl_download_links(shared_state, url, mirror, title)
+        links = data.get("links")
+        if not imdb_id:
+            imdb_id = data.get("imdb_id")
         if links:
             info(f"Decrypted {len(links)} download links for {title}")
             send_discord_message(shared_state, title=title, case="unprotected", imdb_id=imdb_id)
@@ -112,7 +118,10 @@ def download(shared_state, request_from, title, url, mirror, size_mb, password, 
             package_id = None
 
     elif wd and wd.lower() in url.lower():
-        links = get_wd_download_links(shared_state, url, mirror, title)
+        data = get_wd_download_links(shared_state, url, mirror, title)
+        links = data.get("links")
+        if not imdb_id:
+            imdb_id = data.get("imdb_id")
         if links:
             info(f'CAPTCHA-Solution required for "{title}" at: "{shared_state.values['external_address']}/captcha"')
             send_discord_message(shared_state, title=title, case="captcha", imdb_id=imdb_id)

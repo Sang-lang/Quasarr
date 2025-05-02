@@ -2,6 +2,7 @@
 # Quasarr
 # Project by https://github.com/rix1337
 
+import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -32,6 +33,9 @@ def get_search_results(shared_state, request_from, search_string="", mirror=None
 
     functions = []
     if search_string:
+        # Remove trailing year (e.g., 1999, 2021) if present
+        search_string = re.sub(r'\s*(19|20)\d{2}$', '', search_string)
+
         if season and episode:
             search_string = f"{search_string} S{int(season):02}E{int(episode):02}"
         elif season:

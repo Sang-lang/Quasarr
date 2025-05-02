@@ -39,7 +39,10 @@ def get_sf_download_links(shared_state, url, mirror, title):
     release_match = release_pattern.match(title)
 
     if not release_match:
-        return None
+        return {
+            "real_url": None,
+            "imdb_id": None,
+        }
 
     release_parts = release_match.groupdict()
 
@@ -54,6 +57,17 @@ def get_sf_download_links(shared_state, url, mirror, title):
         }
 
         series_page = requests.get(url, headers=headers, timeout=10).text
+
+        soup = BeautifulSoup(series_page, "html.parser")
+        # extract IMDb id if present
+        imdb_id = None
+        a_imdb = soup.find("a", href=re.compile(r"imdb\.com/title/tt\d+"))
+        if a_imdb:
+            m = re.search(r"(tt\d+)", a_imdb["href"])
+            if m:
+                imdb_id = m.group(1)
+                debug(f"Found IMDb id: {imdb_id}")
+
         season_id = re.findall(r"initSeason\('(.+?)\',", series_page)[0]
         epoch = str(datetime.now().timestamp()).replace('.', '')[:-3]
         api_url = 'https://' + sf + '/api/v1/' + season_id + f'/season/{season}?lang=ALL&_=' + epoch
@@ -112,13 +126,19 @@ def get_sf_download_links(shared_state, url, mirror, title):
                         release_url = next(iter(mirrors["season"].values()))
 
                     real_url = resolve_sf_redirect(release_url, shared_state.values["user_agent"])
-                    return real_url
+                    return {
+                        "real_url": real_url,
+                        "imdb_id": imdb_id,
+                    }
             except:
                 continue
     except:
         pass
 
-    return None
+    return {
+        "real_url": None,
+        "imdb_id": None,
+    }
 
 
 def resolve_sf_redirect(url, user_agent):
