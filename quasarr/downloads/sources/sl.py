@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 import requests
 from bs4 import BeautifulSoup
 
-from quasarr.providers.log import info
+from quasarr.providers.log import info, debug
 
 supported_mirrors = ["nitroflare", "ddownload"]  # ignoring captcha-protected multiup/mirrorace for now
 
@@ -25,6 +25,15 @@ def get_sl_download_links(shared_state, url, mirror, title):
         if not entry:
             info(f"Could not find main content section for {title}")
             return False
+
+        # extract IMDb id if present
+        imdb_id = None
+        a_imdb = soup.find("a", href=re.compile(r"imdb\.com/title/tt\d+"))
+        if a_imdb:
+            m = re.search(r"(tt\d+)", a_imdb["href"])
+            if m:
+                imdb_id = m.group(1)
+                debug(f"Found IMDb id: {imdb_id}")
 
         download_h2 = entry.find(
             lambda t: t.name == "h2" and "download" in t.get_text(strip=True).lower()
@@ -75,4 +84,7 @@ def get_sl_download_links(shared_state, url, mirror, title):
             if not mirror or mirror in u:
                 filtered.append(u)
 
-    return filtered
+    return {
+        "links": filtered,
+        "imdb_id": imdb_id,
+    }
