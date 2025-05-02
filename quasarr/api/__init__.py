@@ -37,8 +37,8 @@ def get_api(shared_state_dict, shared_state_lock):
             if not shared_state.values.get("helper_active"):
                 captcha_hint += f"""
                 <p>
-                    <a href="https://github.com/users/rix1337/sponsorship" target="_blank">
-                        Become a Sponsor and let SponsorsHelper solve CAPTCHAs for you!
+                    <a href="https://github.com/rix1337/Quasarr?tab=readme-ov-file#sponsorshelper" target="_blank">
+                        Sponsors get automated CAPTCHA solutions!
                     </a>
                 </p>
                 """

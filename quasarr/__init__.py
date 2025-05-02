@@ -45,8 +45,8 @@ def run():
 └────────────────────────────────────┘""")
 
         print("\n===== Recommended Services =====")
-        print('For automated CAPTCHA solutions use SponsorsHelper: "https://github.com/users/rix1337/sponsorship"')
         print('For convenient universal premium downloads use: "https://linksnappy.com/?ref=397097"')
+        print('Sponsors get automated CAPTCHA solutions: "https://github.com/rix1337/Quasarr?tab=readme-ov-file#sponsorshelper"')
 
         print("\n===== Startup Info =====")
         port = int('8080')

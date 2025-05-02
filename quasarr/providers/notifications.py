@@ -64,7 +64,7 @@ def send_discord_message(shared_state, title, case, imdb_id=None, details=None):
         if not shared_state.values.get("helper_active"):
             fields.append({
                 'name': 'SponsorsHelper',
-                'value': f'[Become a Sponsor and let SponsorsHelper solve CAPTCHAs for you!](https://github.com/users/rix1337/sponsorship)',
+                'value': f'[Sponsors get automated CAPTCHA solutions!](https://github.com/rix1337/Quasarr?tab=readme-ov-file#sponsorshelper)',
             }, )
     elif case == "quasarr_update":
         description = f'Please update to {details["version"]} as soon as possible!'
