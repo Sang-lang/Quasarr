@@ -6,6 +6,7 @@ import html
 import re
 import time
 from base64 import urlsafe_b64encode
+from datetime import datetime, timedelta
 from datetime import datetime as dt
 from urllib.parse import quote, quote_plus
 
@@ -18,6 +19,8 @@ from quasarr.providers.log import info, debug
 hostname = "wd"
 supported_mirrors = ["rapidgator", "ddownload", "katfile", "fikper", "turbobit"]
 
+# regex to detect porn-tag .XXX. (case-insensitive, dots included)
+XXX_REGEX = re.compile(r"\.xxx\.", re.I)
 # regex to detect season/episode tags for series filtering during search
 SEASON_EP_REGEX = re.compile(r"(?i)(?:S\d{1,3}(?:E\d{1,3}(?:-\d{1,3})?)?|S\d{1,3}-\d{1,3})")
 # regex to detect video resolution
@@ -45,16 +48,37 @@ def extract_size(text):
     return {"size": match.group(1), "sizeunit": match.group(2)}
 
 
-def _parse_rows(soup, shared_state, url_base, password, mirror_filter, filter_regex=None, is_search=False):
+def _parse_rows(
+        soup,
+        shared_state,
+        url_base,
+        password,
+        mirror_filter,
+        filter_regex=None,
+        search_string=None,
+):
     """
     Walk the <table> rows, extract one release per row.
     Only include rows with at least one supported mirror.
     If mirror_filter provided, only include rows where mirror_filter is present.
-    If is_search, filter out non-video releases (ebooks, games).
+    If filter_regex provided, only include titles matching it.
+
+    Context detection:
+      - feed when search_string is None
+      - search when search_string is a str
+
+    Porn-filtering:
+      - feed: always drop .XXX.
+      - search: drop .XXX. unless 'xxx' in search_string (case-insensitive)
+
+    If in search context, also filter out non-video releases (ebooks, games).
     """
     releases = []
-    rows = soup.select("table.table tbody tr.lh-sm")
-    for tr in rows:
+    is_search = search_string is not None
+
+    one_hour_ago = (datetime.now() - timedelta(hours=1)).strftime('%Y-%m-%d %H:%M:%S')
+
+    for tr in soup.select("table.table tbody tr.lh-sm"):
         try:
             a = tr.find("a", class_="upload-link")
             raw_href = a["href"]
@@ -68,31 +92,35 @@ def _parse_rows(soup, shared_state, url_base, password, mirror_filter, filter_re
 
             title = a.get_text(strip=True)
 
-            # search-specific filter: require resolution or codec, and no spaces
+            # search context contains non-video releases (ebooks, games, etc.)
             if is_search:
+                # drop .XXX. unless user explicitly searched xxx
+                if XXX_REGEX.search(title) and 'xxx' not in search_string.lower():
+                    continue
+                # require resolution/codec
                 if not (RESOLUTION_REGEX.search(title) or CODEC_REGEX.search(title)):
                     continue
+                # require no spaces in title
                 if " " in title:
                     continue
 
+            # additional pattern filter (e.g. seasons)
             if filter_regex and not filter_regex.search(title):
                 continue
 
             hoster_names = tr.find("span", class_="button-warezkorb")["data-hoster-names"]
             mirrors = [m.strip().lower() for m in hoster_names.split(",")]
             valid = [m for m in mirrors if m in supported_mirrors]
-            if not valid:
+            if not valid or (mirror_filter and mirror_filter not in valid):
                 continue
-            if mirror_filter and mirror_filter not in valid:
-                continue
-
-            imdb_id = None
-            published = convert_to_rss_date(date_txt) if date_txt else None
 
             size_txt = tr.find("span", class_="element-size").get_text(strip=True)
             sz = extract_size(size_txt)
             mb = shared_state.convert_to_mb(sz)
             size_bytes = mb * 1024 * 1024
+
+            imdb_id = None
+            published = convert_to_rss_date(date_txt) if date_txt else one_hour_ago
 
             payload = urlsafe_b64encode(
                 f"{title}|{source}|{mirror_filter}|{mb}|{password}|{imdb_id}".encode()
@@ -127,7 +155,7 @@ def wd_feed(shared_state, start_time, request_from, mirror=None):
     try:
         response = requests.get(url, headers=headers, timeout=10).content
         soup = BeautifulSoup(response, "html.parser")
-        releases = _parse_rows(soup, shared_state, wd, password, mirror, is_search=False)
+        releases = _parse_rows(soup, shared_state, wd, password, mirror)
     except Exception as e:
         info(f"Error loading {hostname.upper()} feed: {e}")
         releases = []
@@ -141,7 +169,7 @@ def wd_search(shared_state, start_time, request_from, search_string, mirror=None
 
     imdb_id = shared_state.is_imdb_id(search_string)
     if imdb_id:
-        search_string = get_localized_title(shared_state, imdb_id, 'en')
+        search_string = get_localized_title(shared_state, imdb_id, 'de')
         if not search_string:
             info(f"Could not extract title from IMDb-ID {imdb_id}")
             return []
@@ -154,7 +182,10 @@ def wd_search(shared_state, start_time, request_from, search_string, mirror=None
     try:
         response = requests.get(url, headers=headers, timeout=10).content
         soup = BeautifulSoup(response, "html.parser")
-        releases = _parse_rows(soup, shared_state, wd, password, mirror, filter_regex, is_search=True)
+        releases = _parse_rows(
+            soup, shared_state, wd, password, mirror,
+            filter_regex=filter_regex, search_string=search_string
+        )
     except Exception as e:
         info(f"Error loading {hostname.upper()} search: {e}")
         releases = []
