@@ -43,48 +43,6 @@ def extract_size(text):
         raise ValueError(f"Invalid size format: {text}")
 
 
-def dw_get_download_links(shared_state, content, title):
-    try:
-        try:
-            content = BeautifulSoup(content, "html.parser")
-        except:
-            content = BeautifulSoup(str(content), "html.parser")
-        download_buttons = content.find_all("button", {"class": "show_link"})
-    except:
-        info(f"{hostname.upper()} has changed the details page. Parsing links for {title} failed!")
-        return False
-
-    dw = shared_state.values["config"]("Hostnames").get(hostname.lower())
-    ajax_url = "https://" + dw + "/wp-admin/admin-ajax.php"
-
-    download_links = []
-    try:
-        for button in download_buttons:
-            payload = "action=show_link&link_id=" + button["value"]
-
-            headers = {
-                'User-Agent': shared_state.values["user_agent"],
-            }
-
-            response = requests.post(ajax_url, payload, headers=headers, timeout=10).json()
-            if response["success"]:
-                link = response["data"].split(",")[0]
-
-                if dw in link:
-                    match = re.search(r'https://' + dw + r'/azn/af\.php\?v=([A-Z0-9]+)(#.*)?', link)
-                    if match:
-                        link = (f'https://filecrypt.cc/Container/{match.group(1)}'
-                                f'.html{match.group(2) if match.group(2) else ""}')
-
-                mirror = button.nextSibling.img["src"].split("/")[-1].replace(".png", "")
-                download_links.append([link, mirror])
-    except:
-        info(f"{hostname.upper()} has changed the site structure. Parsing links for {title} failed!")
-        pass
-
-    return download_links
-
-
 def dw_feed(shared_state, start_time, request_from, mirror=None):
     releases = []
     dw = shared_state.values["config"]("Hostnames").get(hostname.lower())
