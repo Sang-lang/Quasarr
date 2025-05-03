@@ -15,6 +15,10 @@ def setup_sponsors_helper_routes(app):
     @app.get("/sponsors_helper/api/to_decrypt/")
     def to_decrypt_api():
         try:
+            if not shared_state.values["helper_active"]:
+                shared_state.update("helper_active", True)
+                info(f"Sponsor status activated successfully")
+
             protected = shared_state.get_db("protected").retrieve_all_titles()
             if not protected:
                 return abort(404, "No encrypted packages found")

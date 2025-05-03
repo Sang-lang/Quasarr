@@ -29,6 +29,9 @@ def extract_size(size_in_bytes):
 def dd_search(shared_state, start_time, search_string="", mirror=None):
     releases = []
     dd = shared_state.values["config"]("Hostnames").get(hostname.lower())
+    password = dd
+
+    season, episode = shared_state.extract_season_episode(search_string)
 
     dd_session = retrieve_and_validate_session(shared_state)
     if not dd_session:
@@ -40,15 +43,13 @@ def dd_search(shared_state, start_time, search_string="", mirror=None):
               ' Skipping search!')
         return releases
 
-    imdb_id = shared_state.is_imdb_id(search_string)
+    imdb_id = shared_state.is_imdb_id(search_string.split(" ")[0])
     if imdb_id:
         search_string = get_localized_title(shared_state, imdb_id, 'en')
         if not search_string:
             info(f"Could not extract title from IMDb-ID {imdb_id}")
             return releases
         search_string = html.unescape(search_string)
-
-    password = dd
 
     qualities = [
         "disk-480p",
@@ -85,8 +86,13 @@ def dd_search(shared_state, start_time, search_string="", mirror=None):
                 else:
                     title = release.get("release")
 
-                    if search_string and not shared_state.search_string_in_sanitized_title(search_string, title):
+                    if not shared_state.search_string_in_sanitized_title(search_string, title):
                         continue
+
+                    if season:
+                        match = shared_state.match_in_title(title, season=season, episode=episode)
+                        if not match:
+                            continue
 
                     imdb_id = release.get("imdbid", None)
 

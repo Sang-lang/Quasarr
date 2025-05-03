@@ -461,6 +461,51 @@ def is_imdb_id(search_string):
         return None
 
 
+def extract_season_episode(search_string):
+    try:
+        match = re.search(r'(.*?)(S\d{1,3})(?:E(\d{1,3}))?', search_string, re.IGNORECASE)
+        if match:
+            season = int(match.group(2)[1:])
+            episode = int(match.group(3)) if match.group(3) else None
+            return season, episode
+    except Exception as e:
+        debug(f"Error extracting season / episode from {search_string}: {e}")
+    return None, None
+
+
+def match_in_title(title: str, season: int = None, episode: int = None) -> bool:
+    # now supports both S02E01-03 and S02E01-E03
+    pattern = re.compile(
+        r"(?i)(?:\.|^)[sS](\d+)(?:-(\d+))?"           # season or season‑range
+        r"(?:[eE](\d+)(?:-(?:[eE]?)(\d+))?)?"         # episode or episode‑range (allow optional E on the end)
+        r"(?=[\.-]|$)"
+    )
+
+    matches = pattern.findall(title)
+    if not matches:
+        return False
+
+    for s_start, s_end, e_start, e_end in matches:
+        se_start, se_end = int(s_start), int(s_end or s_start)
+        if season is not None and not (se_start <= season <= se_end):
+            continue
+
+        # season matches…
+        if episode is None:
+            # we don’t care about E at all
+            return True
+
+        # must have episode info to check
+        if not e_start:
+            continue
+
+        ep_start, ep_end = int(e_start), int(e_end or e_start)
+        if ep_start <= episode <= ep_end:
+            return True
+
+    return False
+
+
 def search_string_in_sanitized_title(search_string, title):
     sanitized_search_string = sanitize_string(search_string)
     sanitized_title = sanitize_string(title)

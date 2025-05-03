@@ -23,6 +23,8 @@ supported_mirrors = ["rapidgator", "ddownload", "katfile", "fikper", "turbobit"]
 XXX_REGEX = re.compile(r"\.xxx\.", re.I)
 # regex to detect season/episode tags for series filtering during search
 SEASON_EP_REGEX = re.compile(r"(?i)(?:S\d{1,3}(?:E\d{1,3}(?:-\d{1,3})?)?|S\d{1,3}-\d{1,3})")
+# regex to filter out season/episode tags for movies
+MOVIE_REGEX = re.compile(r"^(?!.*(?:S\d{1,3}(?:E\d{1,3}(?:-\d{1,3})?)?|S\d{1,3}-\d{1,3})).*$", re.IGNORECASE)
 # regex to detect video resolution
 RESOLUTION_REGEX = re.compile(r"\d{3,4}p", re.I)
 # regex to detect video codec tags
@@ -56,6 +58,8 @@ def _parse_rows(
         mirror_filter,
         filter_regex=None,
         search_string=None,
+        season=None,
+        episode=None
 ):
     """
     Walk the <table> rows, extract one release per row.
@@ -94,6 +98,14 @@ def _parse_rows(
 
             # search context contains non-video releases (ebooks, games, etc.)
             if is_search:
+                if not shared_state.search_string_in_sanitized_title(search_string, title):
+                    continue
+
+                if season:
+                    match = shared_state.match_in_title(title, season=season, episode=episode)
+                    if not match:
+                        continue
+
                 # drop .XXX. unless user explicitly searched xxx
                 if XXX_REGEX.search(title) and 'xxx' not in search_string.lower():
                     continue
@@ -164,27 +176,35 @@ def wd_feed(shared_state, start_time, request_from, mirror=None):
 
 
 def wd_search(shared_state, start_time, request_from, search_string, mirror=None):
+    releases = []
     wd = shared_state.values["config"]("Hostnames").get(hostname.lower())
     password = wd
 
-    imdb_id = shared_state.is_imdb_id(search_string)
+    season, episode = shared_state.extract_season_episode(search_string)
+
+    imdb_id = shared_state.is_imdb_id(search_string.split(" ")[0])
     if imdb_id:
         search_string = get_localized_title(shared_state, imdb_id, 'de')
         if not search_string:
             info(f"Could not extract title from IMDb-ID {imdb_id}")
-            return []
+            return releases
         search_string = html.unescape(search_string)
 
     q = quote_plus(search_string)
     url = f"https://{wd}/search?q={q}"
     headers = {'User-Agent': shared_state.values["user_agent"]}
-    filter_regex = SEASON_EP_REGEX if "Sonarr" in request_from else None
+    if "Radarr" in request_from:
+        filter_regex = MOVIE_REGEX
+    else:
+        filter_regex = SEASON_EP_REGEX
+
     try:
         response = requests.get(url, headers=headers, timeout=10).content
         soup = BeautifulSoup(response, "html.parser")
         releases = _parse_rows(
             soup, shared_state, wd, password, mirror,
-            filter_regex=filter_regex, search_string=search_string
+            filter_regex=filter_regex, search_string=search_string,
+            season=season, episode=episode
         )
     except Exception as e:
         info(f"Error loading {hostname.upper()} search: {e}")

@@ -76,7 +76,7 @@ docker run -d \
 
 Use this only in case you can't run the docker image.
 
-`pip install `
+`pip install quasarr`
 
 * Requires Python 3.12 or later
 
@@ -138,24 +138,27 @@ Access is automatically granted via GitHub:
 
 ### Generate GitHub Token
 
-1. Open the [GitHub token settings](https://github.com/settings/tokens/new)
-2. Select "New personal access token (classic)"
-3. Fill in the note, e.g., "SponsorsHelper"
-4. Enable the "read:packages" scope
-5. Create and use the token for login as "GITHUB_TOKEN"
+1. Open the [GitHub token settings](https://github.com/settings/tokens/new).
+2. Select `New personal access token (classic)`.
+3. Fill in the note, e.g., `SponsorsHelper`.
+4. Enable the "read:packages" scope.
+5. Create and use the token for login as `GITHUB_TOKEN` below:
 
 ### Login
 
 `docker login https://ghcr.io  -u USERNAME -p GITHUB_TOKEN`
 
-**Without this login, it is not possible to download the image.**
+`USERNAME` is your GitHub username.
+`GITHUB_TOKEN` is the token you created above.
 
 ## Starting SponsorsHelper
+
+Without logging in, it is not possible to download the image!
 
 ```
 docker run -d \
     --name='SponsorsHelper' \
-    -e 'QUASARR_URL'='http://192.168.1.10:8080' \
+    -e 'QUASARR_URL'='http://192.168.0.1:8080' \
     -e 'DEATHBYCAPTCHA_TOKEN'='2FMum5zuDBxMmbXDIsADnllEFl73bomydIpzo7...' \
     'ghcr.io/rix1337-sponsors/docker/helper:latest'
 ```

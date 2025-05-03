@@ -137,6 +137,8 @@ def sl_search(shared_state, start_time, request_from, search_string, mirror=None
     sl = shared_state.values["config"]("Hostnames").get(hostname.lower())
     password = sl
 
+    season, episode = shared_state.extract_season_episode(search_string)
+
     feed_type = "movies" if "Radarr" in request_from else "tv-shows"
 
     if mirror and mirror not in supported_mirrors:
@@ -144,8 +146,7 @@ def sl_search(shared_state, start_time, request_from, search_string, mirror=None
         return releases
 
     try:
-        # Detect IMDb ID and resolve to title
-        imdb_id = shared_state.is_imdb_id(search_string)
+        imdb_id = shared_state.is_imdb_id(search_string.split(" ")[0])
         if imdb_id:
             search_string = get_localized_title(shared_state, imdb_id, 'en') or ''
             search_string = html.unescape(search_string)
@@ -167,8 +168,15 @@ def sl_search(shared_state, start_time, request_from, search_string, mirror=None
                 # Title and link
                 a = post.find('h1').find('a')
                 title = a.get_text(strip=True)
+
                 if not shared_state.search_string_in_sanitized_title(search_string, title):
                     continue
+
+                if season:
+                    match = shared_state.match_in_title(title, season=season, episode=episode)
+                    if not match:
+                        continue
+
                 source = a['href']
 
                 # Published date

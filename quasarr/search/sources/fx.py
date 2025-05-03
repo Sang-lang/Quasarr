@@ -125,15 +125,18 @@ def fx_feed(shared_state, start_time, mirror=None):
 
 def fx_search(shared_state, start_time, search_string, mirror=None):
     releases = []
-
     fx = shared_state.values["config"]("Hostnames").get(hostname.lower())
+    password = fx.split(".")[0]
+
+    season, episode = shared_state.extract_season_episode(search_string)
 
     if mirror and mirror not in supported_mirrors:
         debug(f'Mirror "{mirror}" not supported by "{hostname.upper()}". Supported mirrors: {supported_mirrors}.'
               ' Skipping search!')
         return releases
 
-    password = fx.split(".")[0]
+    imdb_id = shared_state.is_imdb_id(search_string.split(" ")[0])
+
     url = f'https://{fx}/?s={search_string}'
     headers = {
         'User-Agent': shared_state.values["user_agent"],
@@ -147,8 +150,6 @@ def fx_search(shared_state, start_time, search_string, mirror=None):
     except Exception as e:
         info(f"Error loading {hostname.upper()} feed: {e}")
         return releases
-
-    imdb_id = shared_state.is_imdb_id(search_string)
 
     if results:
         for result in results:
@@ -173,8 +174,14 @@ def fx_search(shared_state, start_time, search_string, mirror=None):
                         link = title["href"]
                         title = sanitize_title(title.text)
 
+                        # Since this site supports imdb id search we can't compare title to search string if we have an imdb id
                         if not imdb_id and not shared_state.search_string_in_sanitized_title(search_string, title):
                             continue
+
+                        if season:
+                            match = shared_state.match_in_title(title, season=season, episode=episode)
+                            if not match:
+                                continue
 
                         if not imdb_id:
                             try:

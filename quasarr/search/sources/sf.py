@@ -29,7 +29,6 @@ def parse_mirrors(base_url, entry):
     """
 
     mirrors = {}
-
     try:
         host_map = {
             '1F': '1fichier',
@@ -177,18 +176,6 @@ def sf_feed(shared_state, start_time, request_from, mirror=None):
     return releases
 
 
-def extract_season_episode(search_string):
-    try:
-        match = re.search(r'(.*?)(S\d{1,3})(?:E(\d{1,3}))?', search_string, re.IGNORECASE)
-        if match:
-            season = int(match.group(2)[1:])
-            episode = int(match.group(3)) if match.group(3) else None
-            return season, episode
-    except Exception as e:
-        debug(f"Error extracting season / episode from {search_string}: {e}")
-    return None, None
-
-
 def extract_size(text):
     match = re.match(r"(\d+(\.\d+)?) ([A-Za-z]+)", text)
     if match:
@@ -204,179 +191,181 @@ def sf_search(shared_state, start_time, request_from, search_string, mirror=None
     sf = shared_state.values["config"]("Hostnames").get(hostname.lower())
     password = sf
 
-    season, episode = extract_season_episode(search_string)
+    season, episode = shared_state.extract_season_episode(search_string)
 
-    if "Radarr" in request_from:
-        debug(f'Skipping Radarr search on "{hostname.upper()}" (unsupported media type at hostname)!')
-        return releases
-
-    if mirror and mirror not in supported_mirrors:
-        debug(f'Mirror "{mirror}" not supported by "{hostname.upper()}". Supported mirrors: {supported_mirrors}.'
-              ' Skipping search!')
-        return releases
-
-    if re.match(r'^tt\d{7,8}$', search_string):
-        imdb_id = search_string
-        search_string = get_localized_title(shared_state, imdb_id, 'de')
+    imdb_id_in_search = shared_state.is_imdb_id(search_string.split(" ")[0])
+    if imdb_id_in_search:
+        search_string = get_localized_title(shared_state, imdb_id_in_search, 'de')
         if not search_string:
-            info(f"Could not extract title from IMDb-ID {imdb_id}")
+            info(f"Could not extract title from IMDb-ID {imdb_id_in_search}")
             return releases
         search_string = html.unescape(search_string)
 
+    if "Radarr" in request_from:
+        debug(f'Skipping Radarr search on "{hostname.upper()}" (unsupported media type)!')
+        return releases
+
+    if mirror and mirror not in supported_mirrors:
+        debug(f'Mirror "{mirror}" not supported by "{hostname.upper()}". Supported: {supported_mirrors}.')
+        return releases
+
     one_hour_ago = (datetime.now() - timedelta(hours=1)).strftime('%Y-%m-%d %H:%M:%S')
 
+    # search API
     url = f'https://{sf}/api/v2/search?q={search_string}&ql=DE'
-    headers = {
-        'User-Agent': shared_state.values["user_agent"],
-    }
+    headers = {'User-Agent': shared_state.values["user_agent"]}
 
     try:
-        response = requests.get(url, headers, timeout=10)
+        response = requests.get(url, headers=headers, timeout=10)
         feed = response.json()
     except Exception as e:
         info(f"Error loading {hostname.upper()} search: {e}")
         return releases
 
-    results = feed['result']
+    results = feed.get('result', [])
     for result in results:
         sanitized_search_string = shared_state.sanitize_string(search_string)
-        sanitized_title = shared_state.sanitize_string(result["title"])
+        sanitized_title = shared_state.sanitize_string(result.get("title", ""))
+        if not re.search(rf'\b{re.escape(sanitized_search_string)}\b', sanitized_title):
+            debug(f"Search string '{search_string}' does not match '{result.get('title')}'")
+            continue
+        debug(f"Matched search string '{search_string}' with result '{result.get('title')}'")
 
-        # Use word boundaries to ensure full word/phrase match
-        if re.search(rf'\b{re.escape(sanitized_search_string)}\b', sanitized_title):
-            debug(f"Matched search string '{search_string}' with result '{result['title']}'")
+        series_id = result.get("url_id")
+        context = "recents_sf"
+        threshold = 60
+        recently_searched = shared_state.get_recently_searched(shared_state, context, threshold)
+        entry = recently_searched.get(series_id, {})
+        ts = entry.get("timestamp")
+        use_cache = ts and ts > datetime.now() - timedelta(seconds=threshold)
+
+        if use_cache and entry.get("content"):
+            debug(f"Using cached content for '/{series_id}'")
+            data_html = entry["content"]
+            imdb_cached = entry.get("imdb_id")
+            if imdb_cached:
+                imdb_id = imdb_cached
+            content = BeautifulSoup(data_html, "html.parser")
+        else:
+            # fresh fetch: record timestamp
+            entry = {"timestamp": datetime.now()}
+
+            # load series page
+            series_url = f"https://{sf}/{series_id}"
             try:
-                try:
-                    if not season:
-                        season = "ALL"
+                series_page = requests.get(series_url, headers=headers, timeout=10).text
+                imdb_link = BeautifulSoup(series_page, "html.parser").find("a", href=re.compile(r"imdb\.com"))
+                imdb_id = re.search(r'tt\d+', str(imdb_link)).group() if imdb_link else None
+                season_id = re.findall(r"initSeason\('(.+?)\',", series_page)[0]
+            except Exception:
+                debug(f"Failed to load or parse series page for {series_id}")
+                continue
 
-                    series_id = result["url_id"]
-                    threshold = 15  # this should cut down duplicates in case Sonarr is searching variants of a title
-                    context = "recents_sf"
-                    recently_searched = shared_state.get_recently_searched(shared_state, context, threshold)
-                    if series_id in recently_searched:
-                        if recently_searched[series_id]["timestamp"] > datetime.now() - timedelta(seconds=threshold):
-                            debug(f"'/{series_id}' - requested within the last {threshold} seconds! Skipping...")
-                            continue
+            # fetch API HTML
+            epoch = str(datetime.now().timestamp()).replace('.', '')[:-3]
+            api_url = f'https://{sf}/api/v1/{season_id}/season/ALL?lang=ALL&_={epoch}'
+            debug(f"Requesting SF API URL: {api_url}")
+            try:
+                api_resp = requests.get(api_url, headers=headers, timeout=10)
+                resp_json = api_resp.json()
+                if resp_json.get('error'):
+                    info(f"SF API error for series '{series_id}' at URL {api_url}: {resp_json.get('message')}")
+                    continue
+                data_html = resp_json.get("html", "")
+            except Exception as e:
+                info(f"Error loading SF API for {series_id} at {api_url}: {e}")
+                continue
 
-                    recently_searched[series_id] = {"timestamp": datetime.now()}
-                    shared_state.update(context, recently_searched)
+            # cache content and imdb_id
+            entry["content"] = data_html
+            entry["imdb_id"] = imdb_id
+            recently_searched[series_id] = entry
+            shared_state.update(context, recently_searched)
+            content = BeautifulSoup(data_html, "html.parser")
 
-                    series_url = f"https://{sf}/{series_id}"
-                    series_page = requests.get(series_url, headers, timeout=10).text
-                    try:
-                        imdb_link = (BeautifulSoup(series_page, "html.parser").
-                                     find("a", href=re.compile(r"imdb\.com")))
-                        imdb_id = re.search(r'tt\d+', str(imdb_link)).group()
-                    except:
-                        imdb_id = None
+        # parse episodes/releases
+        for item in content.find_all("h3"):
+            try:
+                details = item.parent.parent.parent
+                title = details.find("small").text.strip()
 
-                    season_id = re.findall(r"initSeason\('(.+?)\',", series_page)[0]
-                    epoch = str(datetime.now().timestamp()).replace('.', '')[:-3]
-                    api_url = 'https://' + sf + '/api/v1/' + season_id + f'/season/{season}?lang=ALL&_=' + epoch
-
-                    response = requests.get(api_url, headers=headers, timeout=10)
-                    data = response.json()["html"]
-                    content = BeautifulSoup(data, "html.parser")
-
-                    items = content.find_all("h3")
-                except:
+                mirrors = parse_mirrors(f"https://{sf}", details)
+                source = mirror and mirrors["season"].get(mirror) or next(iter(mirrors["season"].values()), None)
+                if not source:
+                    debug(f"No source mirror found for {title}")
                     continue
 
-                for item in items:
-                    try:
-                        details = item.parent.parent.parent
-                        title = details.find("small").text.strip()
-
-                        if not shared_state.search_string_in_sanitized_title(search_string, title):
-                            continue
-
-                        size_string = item.find("span", {"class": "morespec"}).text.split("|")[1].strip()
-                        size_item = extract_size(size_string)
-                        mirrors = parse_mirrors(f"https://{sf}", details)
-
-                        if mirror:
-                            if mirror not in mirrors["season"]:
-                                continue
-                            source = mirrors["season"][mirror]
-                            if not source:
-                                info(f"Could not find mirror '{mirror}' for '{title}'")
-                        else:
-                            source = next(iter(mirrors["season"].values()))
-                    except:
-                        debug(f"Could not find link for '{search_string}'")
-                        continue
-
+                try:
+                    size_string = item.find("span", {"class": "morespec"}).text.split("|")[1].strip()
+                    size_item = extract_size(size_string)
                     mb = shared_state.convert_to_mb(size_item)
+                except Exception as e:
+                    debug(f"Error extracting size for {title}: {e}")
+                    mb = 0
 
-                    if episode:
-                        mb = 0
-                        try:
-                            if not re.search(r'S\d{1,3}E\d{1,3}', title):
+                if episode:
+                    try:
+                        if not re.search(r'S\d{1,3}E\d{1,3}', title):
+                            episodes_in_release = len(mirrors["episodes"])
+
+                            # Get the correct episode entry (episode numbers are 1-based, list index is 0-based)
+                            episode_data = next((e for e in mirrors["episodes"] if e["number"] == int(episode)),
+                                                None)
+
+                            if episode_data:
                                 title = re.sub(r'(S\d{1,3})', rf'\1E{episode:02d}', title)
-
-                                # Count episodes
-                                episodes_in_release = len(mirrors["episodes"])
-
-                                # Get the correct episode entry (episode numbers are 1-based, list index is 0-based)
-                                episode_data = next((e for e in mirrors["episodes"] if e["number"] == int(episode)),
-                                                    None)
-
-                                if episode_data:
-                                    if mirror:
-                                        if mirror not in episode_data["links"]:
-                                            debug(
-                                                f"Mirror '{mirror}' does not exist for '{title}' episode {episode}'")
-                                        else:
-                                            source = episode_data["links"][mirror]
-
+                                if mirror:
+                                    if mirror not in episode_data["links"]:
+                                        debug(
+                                            f"Mirror '{mirror}' does not exist for '{title}' episode {episode}'")
                                     else:
-                                        source = next(iter(episode_data["links"].values()))
-                                else:
-                                    debug(f"Episode '{episode}' data not found in mirrors for '{title}'")
+                                        source = episode_data["links"][mirror]
 
-                                if episodes_in_release:
+                                else:
+                                    source = next(iter(episode_data["links"].values()))
+                            else:
+                                debug(f"Episode '{episode}' data not found in mirrors for '{title}'")
+
+                            if episodes_in_release:
+                                try:
                                     mb = shared_state.convert_to_mb({
                                         "size": float(size_item["size"]) // episodes_in_release,
                                         "sizeunit": size_item["sizeunit"]
                                     })
-                        except:
-                            continue
-
-                    payload = urlsafe_b64encode(f"{title}|{source}|{mirror}|{mb}|{password}|{imdb_id}".
-                                                encode("utf-8")).decode("utf-8")
-                    link = f"{shared_state.values['internal_address']}/download/?payload={payload}"
-
-                    try:
-                        size = mb * 1024 * 1024
+                                except Exception as e:
+                                    debug(f"Error calculating size for {title}: {e}")
+                                    mb = 0
                     except:
                         continue
 
-                    try:
-                        published = one_hour_ago  # release date is missing here
-                    except:
+                if not shared_state.search_string_in_sanitized_title(search_string, title):
+                    continue
+
+                if season:
+                    match = shared_state.match_in_title(title, season=season, episode=episode)
+                    if not match:
                         continue
 
-                    releases.append({
-                        "details": {
-                            "title": title,
-                            "hostname": hostname.lower(),
-                            "imdb_id": imdb_id,
-                            "link": link,
-                            "mirror": mirror,
-                            "size": size,
-                            "date": published,
-                            "source": f"{series_url}/{season}" if season else series_url
-                        },
-                        "type": "protected"
-                    })
+                payload = urlsafe_b64encode(f"{title}|{source}|{mirror}|{mb}|{password}|{imdb_id}".encode()).decode()
+                link = f"{shared_state.values['internal_address']}/download/?payload={payload}"
+                size_bytes = mb * 1024 * 1024
 
+                releases.append({
+                    "details": {
+                        "title": title,
+                        "hostname": hostname.lower(),
+                        "imdb_id": imdb_id,
+                        "link": link,
+                        "mirror": mirror,
+                        "size": size_bytes,
+                        "date": one_hour_ago,
+                        "source": f"https://{sf}/{series_id}/{season}" if season else f"https://{sf}/{series_id}"
+                    },
+                    "type": "protected"
+                })
             except Exception as e:
-                info(f"Error parsing {hostname.upper()} search: {e}")
-        else:
-            debug(f"Search string '{search_string}' does not match result '{result['title']}'")
+                debug(f"Error parsing item for '{search_string}': {e}")
 
     elapsed_time = time.time() - start_time
     debug(f"Time taken: {elapsed_time:.2f} seconds ({hostname.lower()})")
-
     return releases
