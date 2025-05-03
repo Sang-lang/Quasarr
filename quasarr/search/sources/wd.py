@@ -23,6 +23,8 @@ supported_mirrors = ["rapidgator", "ddownload", "katfile", "fikper", "turbobit"]
 XXX_REGEX = re.compile(r"\.xxx\.", re.I)
 # regex to detect season/episode tags for series filtering during search
 SEASON_EP_REGEX = re.compile(r"(?i)(?:S\d{1,3}(?:E\d{1,3}(?:-\d{1,3})?)?|S\d{1,3}-\d{1,3})")
+# regex to filter out season/episode tags for movies
+MOVIE_REGEX = re.compile(r"^(?!.*(?:S\d{1,3}(?:E\d{1,3}(?:-\d{1,3})?)?|S\d{1,3}-\d{1,3})).*$", re.IGNORECASE)
 # regex to detect video resolution
 RESOLUTION_REGEX = re.compile(r"\d{3,4}p", re.I)
 # regex to detect video codec tags
@@ -178,7 +180,11 @@ def wd_search(shared_state, start_time, request_from, search_string, mirror=None
     q = quote_plus(search_string)
     url = f"https://{wd}/search?q={q}"
     headers = {'User-Agent': shared_state.values["user_agent"]}
-    filter_regex = SEASON_EP_REGEX if "Sonarr" in request_from else None
+    if "Radarr" in request_from:
+        filter_regex = MOVIE_REGEX
+    else:
+        filter_regex = SEASON_EP_REGEX
+
     try:
         response = requests.get(url, headers=headers, timeout=10).content
         soup = BeautifulSoup(response, "html.parser")
