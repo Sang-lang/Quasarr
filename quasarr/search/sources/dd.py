@@ -40,7 +40,7 @@ def dd_search(shared_state, start_time, search_string="", mirror=None):
               ' Skipping search!')
         return releases
 
-    imdb_id = shared_state.is_imdb_id(search_string)
+    imdb_id = shared_state.is_imdb_id(search_string.split(" ")[0])
     if imdb_id:
         search_string = get_localized_title(shared_state, imdb_id, 'en')
         if not search_string:

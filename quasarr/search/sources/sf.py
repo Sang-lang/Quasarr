@@ -204,6 +204,14 @@ def sf_search(shared_state, start_time, request_from, search_string, mirror=None
     sf = shared_state.values["config"]("Hostnames").get(hostname.lower())
     password = sf
 
+    imdb_id = shared_state.is_imdb_id(search_string.split(" ")[0])
+    if imdb_id:
+        search_string = get_localized_title(shared_state, imdb_id, 'de')
+        if not search_string:
+            info(f"Could not extract title from IMDb-ID {imdb_id}")
+            return releases
+        search_string = html.unescape(search_string)
+
     season, episode = extract_season_episode(search_string)
 
     if "Radarr" in request_from:

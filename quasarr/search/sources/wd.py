@@ -167,7 +167,7 @@ def wd_search(shared_state, start_time, request_from, search_string, mirror=None
     wd = shared_state.values["config"]("Hostnames").get(hostname.lower())
     password = wd
 
-    imdb_id = shared_state.is_imdb_id(search_string)
+    imdb_id = shared_state.is_imdb_id(search_string.split(" ")[0])
     if imdb_id:
         search_string = get_localized_title(shared_state, imdb_id, 'de')
         if not search_string:

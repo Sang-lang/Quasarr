@@ -5,7 +5,6 @@
 import traceback
 import xml.sax.saxutils as sax_utils
 from base64 import urlsafe_b64decode
-from datetime import datetime
 from functools import wraps
 from xml.etree import ElementTree
 
@@ -163,7 +162,10 @@ def setup_arr_routes(app):
                     debug(f'Search will only return releases that match this mirror: "{mirror}"')
 
                 mode = request.query.t
+                request_from = request.headers.get('User-Agent')
+
                 if mode == 'caps':
+                    info(f"Providing indexer capability information to {request_from}")
                     return '''<?xml version="1.0" encoding="UTF-8"?>
                                 <caps>
                                   <server 
@@ -172,11 +174,11 @@ def setup_arr_routes(app):
                                     url="https://quasarr.indexer/" 
                                     email="support@quasarr.indexer" 
                                   />
-                                  <limits max="100" default="100" />
+                                  <limits max="999" default="999" />
                                   <registration available="no" open="no" />
                                   <searching>
                                     <search available="yes" supportedParams="q" />
-                                    <tv-search available="yes" supportedParams="q,season,ep" />
+                                    <tv-search available="yes" supportedParams="q,imdbid,season,ep" />
                                     <movie-search available="yes" supportedParams="imdbid" />
                                   </searching>
                                   <categories>
@@ -185,12 +187,10 @@ def setup_arr_routes(app):
                                   </categories>
                                 </caps>'''
                 elif mode in ['movie', 'tvsearch', 'search']:
-                    request_from = request.headers.get('User-Agent')
-
                     releases = []
 
                     if mode == 'movie':
-                        # only imdbid is supported
+                        # supported params: imdbid
                         search_param = f"tt{getattr(request.query, 'imdbid', '')}" \
                             if getattr(request.query, 'imdbid', '') else ""
 
@@ -203,8 +203,13 @@ def setup_arr_routes(app):
                         debug(f'Search in Anime-Order is not supported. Ignoring request: {dict(request.query)}')
 
                     elif mode == 'tvsearch':
-                        # only q, season and ep are supported
-                        search_param = getattr(request.query, 'q', "")
+                        # supported params: q, imdbid, season and ep
+                        if getattr(request.query, 'imdbid', ''):
+                            search_param = getattr(request.query, 'imdbid', '')
+                            if not search_param.startswith("tt"):
+                                search_param = f"tt{search_param}"
+                        else:
+                            search_param = getattr(request.query, 'q', "")
                         season = getattr(request.query, 'season', "")
                         episode = getattr(request.query, 'ep', "")
 
@@ -220,18 +225,6 @@ def setup_arr_routes(app):
                             debug(f'Offset higher than 0 is not supported. Ignoring request: {dict(request.query)}')
 
                     items = ""
-                    if not releases:
-                        items += f'''
-                            <item>
-                                <title>No releases found</title>
-                                <link></link>
-                                <pubDate>{datetime.now().strftime('%a, %d %b %Y %H:%M:%S %z')}</pubDate>
-                                <enclosure url="_" length="0" type="application/x-nzb"/>
-                                <guid></guid>
-                                <comments></comments>
-                                <description></description>
-                            </item>'''
-
                     for release in releases:
                         release = release["details"]
 
@@ -248,7 +241,7 @@ def setup_arr_routes(app):
                         </item>'''
 
                     return f'''<?xml version="1.0" encoding="UTF-8"?>
-                                <rss version="2.0">
+                                <rss>
                                     <channel>
                                         {items}
                                     </channel>

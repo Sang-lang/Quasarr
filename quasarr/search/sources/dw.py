@@ -142,7 +142,7 @@ def dw_search(shared_state, start_time, request_from, search_string, mirror=None
         info(f"Error loading {hostname.upper()} search feed: {e}")
         return releases
 
-    imdb_id = shared_state.is_imdb_id(search_string)
+    imdb_id = shared_state.is_imdb_id(search_string.split(" ")[0])
 
     if results:
         for result in results:
