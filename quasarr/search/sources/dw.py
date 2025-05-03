@@ -119,6 +119,8 @@ def dw_search(shared_state, start_time, request_from, search_string, mirror=None
     dw = shared_state.values["config"]("Hostnames").get(hostname.lower())
     password = dw
 
+    season, episode = shared_state.extract_season_episode(search_string)
+
     if "Radarr" in request_from:
         search_type = "videocategory=filme"
     else:
@@ -149,8 +151,14 @@ def dw_search(shared_state, start_time, request_from, search_string, mirror=None
             try:
                 title = result.a.text.strip()
 
+                # Since this site supports imdb id search we can't compare title to search string if we have an imdb id
                 if not imdb_id and not shared_state.search_string_in_sanitized_title(search_string, title):
                     continue
+
+                if season:
+                    match = shared_state.match_in_title(title, season=season, episode=episode)
+                    if not match:
+                        continue
 
                 if not imdb_id:
                     try:

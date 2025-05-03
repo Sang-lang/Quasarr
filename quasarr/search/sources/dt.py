@@ -137,6 +137,8 @@ def dt_search(shared_state, start_time, request_from, search_string, mirror=None
     dt = shared_state.values["config"]("Hostnames").get(hostname.lower())
     password = dt
 
+    season, episode = shared_state.extract_season_episode(search_string)
+
     cat_id = "9" if "Radarr" in request_from else "64"
 
     if mirror and mirror not in supported_mirrors:
@@ -185,7 +187,20 @@ def dt_search(shared_state, start_time, request_from, search_string, mirror=None
                     continue
                 source = link_tag["href"]
                 title_raw = link_tag.text.strip()
-                title = title_raw.replace(' - ', '-').replace(' ', '.').replace('(', '').replace(')', '')
+                title = (title_raw.
+                         replace(' - ', '-').
+                         replace(' ', '.').
+                         replace('(', '').
+                         replace(')', '')
+                         )
+
+                if not shared_state.search_string_in_sanitized_title(search_string, title):
+                    continue
+
+                if season:
+                    match = shared_state.match_in_title(title, season=season, episode=episode)
+                    if not match:
+                        continue
 
                 try:
                     imdb_id = re.search(r"tt\d+", str(article)).group()

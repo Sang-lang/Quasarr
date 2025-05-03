@@ -18,6 +18,7 @@ supported_mirrors = ["1fichier", "ddownload", "katfile", "rapidgator", "turbobit
 
 from bs4 import BeautifulSoup
 
+
 def parse_mirrors(base_url, entry):
     """
     entry: a BeautifulSoup Tag for <div class="entry">
@@ -175,18 +176,6 @@ def sf_feed(shared_state, start_time, request_from, mirror=None):
     return releases
 
 
-def extract_season_episode(search_string):
-    try:
-        match = re.search(r'(.*?)(S\d{1,3})(?:E(\d{1,3}))?', search_string, re.IGNORECASE)
-        if match:
-            season = int(match.group(2)[1:])
-            episode = int(match.group(3)) if match.group(3) else None
-            return season, episode
-    except Exception as e:
-        debug(f"Error extracting season / episode from {search_string}: {e}")
-    return None, None
-
-
 def extract_size(text):
     match = re.match(r"(\d+(\.\d+)?) ([A-Za-z]+)", text)
     if match:
@@ -202,7 +191,7 @@ def sf_search(shared_state, start_time, request_from, search_string, mirror=None
     sf = shared_state.values["config"]("Hostnames").get(hostname.lower())
     password = sf
 
-    season, episode = extract_season_episode(search_string)
+    season, episode = shared_state.extract_season_episode(search_string)
 
     imdb_id_in_search = shared_state.is_imdb_id(search_string.split(" ")[0])
     if imdb_id_in_search:
@@ -300,16 +289,6 @@ def sf_search(shared_state, start_time, request_from, search_string, mirror=None
                 details = item.parent.parent.parent
                 title = details.find("small").text.strip()
 
-                if season:
-                    # Match all patterns like .S01., .S03E10., .S03-05, etc.
-                    matches = re.findall(r'\.S(\d+)(?:[-](\d+))?(?=[\.-Ee])', title, re.IGNORECASE)
-                    if not any(
-                            int(start) <= season <= int(end) if end else int(start) == season
-                            for start, end in matches
-                    ):
-                        debug(f"Season {season} not found in {title}")
-                        continue
-
                 mirrors = parse_mirrors(f"https://{sf}", details)
                 source = mirror and mirrors["season"].get(mirror) or next(iter(mirrors["season"].values()), None)
                 if not source:
@@ -357,6 +336,14 @@ def sf_search(shared_state, start_time, request_from, search_string, mirror=None
                                     debug(f"Error calculating size for {title}: {e}")
                                     mb = 0
                     except:
+                        continue
+
+                if not shared_state.search_string_in_sanitized_title(search_string, title):
+                    continue
+
+                if season:
+                    match = shared_state.match_in_title(title, season=season, episode=episode)
+                    if not match:
                         continue
 
                 payload = urlsafe_b64encode(f"{title}|{source}|{mirror}|{mb}|{password}|{imdb_id}".encode()).decode()

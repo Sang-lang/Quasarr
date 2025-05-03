@@ -97,6 +97,8 @@ def nx_search(shared_state, start_time, request_from, search_string, mirror=None
     nx = shared_state.values["config"]("Hostnames").get(hostname.lower())
     password = nx
 
+    season, episode = shared_state.extract_season_episode(search_string)
+
     if "Radarr" in request_from:
         valid_type = "movie"
     else:
@@ -135,6 +137,11 @@ def nx_search(shared_state, start_time, request_from, search_string, mirror=None
                 if title:
                     if not shared_state.search_string_in_sanitized_title(search_string, title):
                         continue
+
+                    if season:
+                        match = shared_state.match_in_title(title, season=season, episode=episode)
+                        if not match:
+                            continue
 
                     try:
                         source = f"https://{nx}/release/{item['slug']}"
