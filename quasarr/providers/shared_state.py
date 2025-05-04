@@ -6,6 +6,7 @@ import json
 import os
 import re
 import time
+import traceback
 from datetime import datetime, timedelta
 from urllib import parse
 
@@ -17,6 +18,11 @@ from quasarr.storage.sqlite_database import DataBase
 
 values = {}
 lock = None
+
+# regex to detect season/episode tags for series filtering during search
+SEASON_EP_REGEX = re.compile(r"(?i)(?:S\d{1,3}(?:E\d{1,3}(?:-\d{1,3})?)?|S\d{1,3}-\d{1,3})")
+# regex to filter out season/episode tags for movies
+MOVIE_REGEX = re.compile(r"^(?!.*(?:S\d{1,3}(?:E\d{1,3}(?:-\d{1,3})?)?|S\d{1,3}-\d{1,3})).*$", re.IGNORECASE)
 
 
 def set_state(manager_dict, manager_lock):
@@ -454,58 +460,6 @@ def sanitize_string(s):
     return s
 
 
-def is_imdb_id(search_string):
-    if bool(re.fullmatch(r"tt\d{7,}", search_string)):
-        return search_string
-    else:
-        return None
-
-
-def extract_season_episode(search_string):
-    try:
-        match = re.search(r'(.*?)(S\d{1,3})(?:E(\d{1,3}))?', search_string, re.IGNORECASE)
-        if match:
-            season = int(match.group(2)[1:])
-            episode = int(match.group(3)) if match.group(3) else None
-            return season, episode
-    except Exception as e:
-        debug(f"Error extracting season / episode from {search_string}: {e}")
-    return None, None
-
-
-def match_in_title(title: str, season: int = None, episode: int = None) -> bool:
-    # now supports both S02E01-03 and S02E01-E03
-    pattern = re.compile(
-        r"(?i)(?:\.|^)[sS](\d+)(?:-(\d+))?"           # season or season‑range
-        r"(?:[eE](\d+)(?:-(?:[eE]?)(\d+))?)?"         # episode or episode‑range (allow optional E on the end)
-        r"(?=[\.-]|$)"
-    )
-
-    matches = pattern.findall(title)
-    if not matches:
-        return False
-
-    for s_start, s_end, e_start, e_end in matches:
-        se_start, se_end = int(s_start), int(s_end or s_start)
-        if season is not None and not (se_start <= season <= se_end):
-            continue
-
-        # season matches…
-        if episode is None:
-            # we don’t care about E at all
-            return True
-
-        # must have episode info to check
-        if not e_start:
-            continue
-
-        ep_start, ep_end = int(e_start), int(e_end or e_start)
-        if ep_start <= episode <= ep_end:
-            return True
-
-    return False
-
-
 def search_string_in_sanitized_title(search_string, title):
     sanitized_search_string = sanitize_string(search_string)
     sanitized_title = sanitize_string(title)
@@ -516,6 +470,121 @@ def search_string_in_sanitized_title(search_string, title):
         return True
     else:
         debug(f"Skipping {title} as it doesn't match search string: {sanitized_search_string}")
+        return False
+
+
+def is_imdb_id(search_string):
+    if bool(re.fullmatch(r"tt\d{7,}", search_string)):
+        return search_string
+    else:
+        return None
+
+
+def match_in_title(title: str, season: int = None, episode: int = None) -> bool:
+    # ensure season/episode are ints (or None)
+    if isinstance(season, str):
+        try:
+            season = int(season)
+        except ValueError:
+            season = None
+    if isinstance(episode, str):
+        try:
+            episode = int(episode)
+        except ValueError:
+            episode = None
+
+    pattern = re.compile(
+        r"(?i)(?:\.|^)[sS](\d+)(?:-(\d+))?"  # season or season‑range
+        r"(?:[eE](\d+)(?:-(?:[eE]?)(\d+))?)?"  # episode or episode‑range
+        r"(?=[\.-]|$)"
+    )
+
+    matches = pattern.findall(title)
+    if not matches:
+        return False
+
+    for s_start, s_end, e_start, e_end in matches:
+        se_start, se_end = int(s_start), int(s_end or s_start)
+
+        # if a season was requested, ensure it falls in the range
+        if season is not None and not (se_start <= season <= se_end):
+            continue
+
+        # if no episode requested, only accept if the title itself had no episode tag
+        if episode is None:
+            if not e_start:
+                return True
+            else:
+                # title did specify an episode — skip this match
+                continue
+
+        # episode was requested, so title must supply one
+        if not e_start:
+            continue
+
+        ep_start, ep_end = int(e_start), int(e_end or e_start)
+        if ep_start <= episode <= ep_end:
+            return True
+
+    return False
+
+
+def is_valid_release(title: str,
+                     request_from: str,
+                     search_string: str,
+                     season: int = None,
+                     episode: int = None) -> bool:
+    """
+    Return True if the given release title is valid for the given search parameters.
+    - title: the release title to test
+    - request_from: user agent, contains 'Radarr' for movie searches or 'Sonarr' for TV searches
+    - search_string: the original search phrase (could be an IMDb id or plain text)
+    - season: desired season number (or None)
+    - episode: desired episode number (or None)
+    """
+    try:
+        # if search string is NOT an imdb id check search_string_in_sanitized_title - if not match, its not valid
+        if not is_imdb_id(search_string):
+            if not search_string_in_sanitized_title(search_string, title):
+                debug(f"Skipping {title!r} as it doesn't match sanitized search string: {search_string!r}")
+                return False
+
+        # Determine whether this is a movie or TV search
+        rf = request_from.lower()
+        is_movie_search = 'radarr' in rf
+        is_tv_search = 'sonarr' in rf
+
+        # if it's a movie search, don't allow any TV show titles (check for NO season or episode tags in the title)
+        if is_movie_search:
+            if not MOVIE_REGEX.match(title):
+                debug(f"Skipping {title!r} as title doesn't match movie regex: {MOVIE_REGEX.pattern}")
+                return False
+            return True
+
+        # if it's a TV show search, don't allow any movies (check for season or episode tags in the title)
+        if is_tv_search:
+            # must have some S/E tag present
+            if not SEASON_EP_REGEX.search(title):
+                debug(f"Skipping {title!r} as title doesn't match TV show regex: {SEASON_EP_REGEX.pattern}")
+                return False
+            # if caller specified a season or episode, double‑check the match
+            if season is not None or episode is not None:
+                if not match_in_title(title, season, episode):
+                    debug(f"Skipping {title!r} as it doesn't match season {season} and episode {episode}")
+                    return False
+            return True
+
+        # unknown search source — reject by default
+        debug(f"Skipping {title!r} as search source is unknown: {request_from!r}")
+        return False
+
+    except Exception as e:
+        # log exception message and short stack trace
+        tb = traceback.format_exc()
+        debug(f"Exception in is_valid_release: {e!r}\n{tb}"
+              f"is_valid_release called with "
+              f"title={title!r}, request_from={request_from!r}, "
+              f"search_string={search_string!r}, season={season!r}, episode={episode!r}")
         return False
 
 

@@ -186,14 +186,12 @@ def extract_size(text):
         raise ValueError(f"Invalid size format: {text}")
 
 
-def sf_search(shared_state, start_time, request_from, search_string, mirror=None):
+def sf_search(shared_state, start_time, request_from, search_string, mirror=None, season=None, episode=None):
     releases = []
     sf = shared_state.values["config"]("Hostnames").get(hostname.lower())
     password = sf
 
-    season, episode = shared_state.extract_season_episode(search_string)
-
-    imdb_id_in_search = shared_state.is_imdb_id(search_string.split(" ")[0])
+    imdb_id_in_search = shared_state.is_imdb_id(search_string)
     if imdb_id_in_search:
         search_string = get_localized_title(shared_state, imdb_id_in_search, 'de')
         if not search_string:
@@ -338,13 +336,13 @@ def sf_search(shared_state, start_time, request_from, search_string, mirror=None
                     except:
                         continue
 
-                if not shared_state.search_string_in_sanitized_title(search_string, title):
+                # check down here on purpose, because the title may be modified at episode stage
+                if not shared_state.is_valid_release(title,
+                                                                     request_from,
+                                                                     search_string,
+                                                                     season,
+                                                                     episode):
                     continue
-
-                if season:
-                    match = shared_state.match_in_title(title, season=season, episode=episode)
-                    if not match:
-                        continue
 
                 payload = urlsafe_b64encode(f"{title}|{source}|{mirror}|{mb}|{password}|{imdb_id}".encode()).decode()
                 link = f"{shared_state.values['internal_address']}/download/?payload={payload}"
