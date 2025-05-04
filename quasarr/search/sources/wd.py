@@ -21,10 +21,6 @@ supported_mirrors = ["rapidgator", "ddownload", "katfile", "fikper", "turbobit"]
 
 # regex to detect porn-tag .XXX. (case-insensitive, dots included)
 XXX_REGEX = re.compile(r"\.xxx\.", re.I)
-# regex to detect season/episode tags for series filtering during search
-SEASON_EP_REGEX = re.compile(r"(?i)(?:S\d{1,3}(?:E\d{1,3}(?:-\d{1,3})?)?|S\d{1,3}-\d{1,3})")
-# regex to filter out season/episode tags for movies
-MOVIE_REGEX = re.compile(r"^(?!.*(?:S\d{1,3}(?:E\d{1,3}(?:-\d{1,3})?)?|S\d{1,3}-\d{1,3})).*$", re.IGNORECASE)
 # regex to detect video resolution
 RESOLUTION_REGEX = re.compile(r"\d{3,4}p", re.I)
 # regex to detect video codec tags
@@ -56,7 +52,7 @@ def _parse_rows(
         url_base,
         password,
         mirror_filter,
-        filter_regex=None,
+        request_from=None,
         search_string=None,
         season=None,
         episode=None
@@ -65,7 +61,6 @@ def _parse_rows(
     Walk the <table> rows, extract one release per row.
     Only include rows with at least one supported mirror.
     If mirror_filter provided, only include rows where mirror_filter is present.
-    If filter_regex provided, only include titles matching it.
 
     Context detection:
       - feed when search_string is None
@@ -98,13 +93,12 @@ def _parse_rows(
 
             # search context contains non-video releases (ebooks, games, etc.)
             if is_search:
-                if not shared_state.search_string_in_sanitized_title(search_string, title):
+                if not shared_state.is_valid_release(title,
+                                                                     request_from,
+                                                                     search_string,
+                                                                     season,
+                                                                     episode):
                     continue
-
-                if season:
-                    match = shared_state.match_in_title(title, season=season, episode=episode)
-                    if not match:
-                        continue
 
                 # drop .XXX. unless user explicitly searched xxx
                 if XXX_REGEX.search(title) and 'xxx' not in search_string.lower():
@@ -115,10 +109,6 @@ def _parse_rows(
                 # require no spaces in title
                 if " " in title:
                     continue
-
-            # additional pattern filter (e.g. seasons)
-            if filter_regex and not filter_regex.search(title):
-                continue
 
             hoster_names = tr.find("span", class_="button-warezkorb")["data-hoster-names"]
             mirrors = [m.strip().lower() for m in hoster_names.split(",")]
@@ -175,14 +165,12 @@ def wd_feed(shared_state, start_time, request_from, mirror=None):
     return releases
 
 
-def wd_search(shared_state, start_time, request_from, search_string, mirror=None):
+def wd_search(shared_state, start_time, request_from, search_string, mirror=None, season=None, episode=None):
     releases = []
     wd = shared_state.values["config"]("Hostnames").get(hostname.lower())
     password = wd
 
-    season, episode = shared_state.extract_season_episode(search_string)
-
-    imdb_id = shared_state.is_imdb_id(search_string.split(" ")[0])
+    imdb_id = shared_state.is_imdb_id(search_string)
     if imdb_id:
         search_string = get_localized_title(shared_state, imdb_id, 'de')
         if not search_string:
@@ -193,17 +181,14 @@ def wd_search(shared_state, start_time, request_from, search_string, mirror=None
     q = quote_plus(search_string)
     url = f"https://{wd}/search?q={q}"
     headers = {'User-Agent': shared_state.values["user_agent"]}
-    if "Radarr" in request_from:
-        filter_regex = MOVIE_REGEX
-    else:
-        filter_regex = SEASON_EP_REGEX
 
     try:
         response = requests.get(url, headers=headers, timeout=10).content
         soup = BeautifulSoup(response, "html.parser")
         releases = _parse_rows(
             soup, shared_state, wd, password, mirror,
-            filter_regex=filter_regex, search_string=search_string,
+            request_from=request_from,
+            search_string=search_string,
             season=season, episode=episode
         )
     except Exception as e:

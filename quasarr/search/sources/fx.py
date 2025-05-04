@@ -37,7 +37,7 @@ def extract_size(text):
         raise ValueError(f"Invalid size format: {text}")
 
 
-def fx_feed(shared_state, start_time, mirror=None):
+def fx_feed(shared_state, start_time, request_from, mirror=None):
     releases = []
 
     fx = shared_state.values["config"]("Hostnames").get(hostname.lower())
@@ -123,19 +123,15 @@ def fx_feed(shared_state, start_time, mirror=None):
     return releases
 
 
-def fx_search(shared_state, start_time, search_string, mirror=None):
+def fx_search(shared_state, start_time, request_from, search_string, mirror=None, season=None, episode=None):
     releases = []
     fx = shared_state.values["config"]("Hostnames").get(hostname.lower())
     password = fx.split(".")[0]
-
-    season, episode = shared_state.extract_season_episode(search_string)
 
     if mirror and mirror not in supported_mirrors:
         debug(f'Mirror "{mirror}" not supported by "{hostname.upper()}". Supported mirrors: {supported_mirrors}.'
               ' Skipping search!')
         return releases
-
-    imdb_id = shared_state.is_imdb_id(search_string.split(" ")[0])
 
     url = f'https://{fx}/?s={search_string}'
     headers = {
@@ -174,21 +170,18 @@ def fx_search(shared_state, start_time, search_string, mirror=None):
                         link = title["href"]
                         title = sanitize_title(title.text)
 
-                        # Since this site supports imdb id search we can't compare title to search string if we have an imdb id
-                        if not imdb_id and not shared_state.search_string_in_sanitized_title(search_string, title):
+                        if not shared_state.is_valid_release(title,
+                                                             request_from,
+                                                             search_string,
+                                                             season,
+                                                             episode):
                             continue
 
-                        if season:
-                            match = shared_state.match_in_title(title, season=season, episode=episode)
-                            if not match:
-                                continue
-
-                        if not imdb_id:
-                            try:
-                                imdb_link = article.find("a", href=re.compile(r"imdb\.com"))
-                                imdb_id = re.search(r'tt\d+', str(imdb_link)).group()
-                            except:
-                                imdb_id = None
+                        try:
+                            imdb_link = article.find("a", href=re.compile(r"imdb\.com"))
+                            imdb_id = re.search(r'tt\d+', str(imdb_link)).group()
+                        except:
+                            imdb_id = None
 
                         try:
                             size_info = article.find_all("strong", text=re.compile(r"(size|größe)", re.IGNORECASE))[

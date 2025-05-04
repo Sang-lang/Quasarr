@@ -210,8 +210,8 @@ def setup_arr_routes(app):
                                 search_param = f"tt{search_param}"
                         else:
                             search_param = getattr(request.query, 'q', "")
-                        season = getattr(request.query, 'season', "")
-                        episode = getattr(request.query, 'ep', "")
+                        season = getattr(request.query, 'season', None)
+                        episode = getattr(request.query, 'ep', None)
 
                         offset = getattr(request.query, 'offset', "")  # ignoring offset higher than 0 on purpose
                         if int(offset) == 0:

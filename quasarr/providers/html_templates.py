@@ -2,6 +2,8 @@
 # Quasarr
 # Project by https://github.com/rix1337
 
+from quasarr.providers.version import get_version
+
 def render_centered_html(inner_content):
     head = '''
     <head>
@@ -63,6 +65,7 @@ def render_centered_html(inner_content):
             *, *::before, *::after {
                 box-sizing: border-box;
             }
+            /* make body a column flex so footer can stick to bottom */
             html, body {
                 margin: 0;
                 padding: 0;
@@ -73,12 +76,15 @@ def render_centered_html(inner_content):
                 font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue',
                     'Noto Sans', Arial, sans-serif;
                 line-height: 1.6;
+                display: flex;
+                flex-direction: column;
+                min-height: 100vh;
             }
             .outer {
+                flex: 1;
                 display: flex;
                 justify-content: center;
                 align-items: center;
-                min-height: 100vh; /* allow container to expand */
                 padding: var(--spacing);
             }
             .inner {
@@ -96,7 +102,6 @@ def render_centered_html(inner_content):
                     padding-left: 0;
                     padding-right: 0;
                 }
-            
                 body:has(iframe) .inner {
                     padding-left: 0;
                     padding-right: 0;
@@ -154,6 +159,13 @@ def render_centered_html(inner_content):
             a:hover {
                 text-decoration: underline;
             }
+            /* footer styling */
+            footer {
+                text-align: center;
+                font-size: 0.75rem;
+                color: var(--secondary);
+                padding: 0.5rem 0;
+            }
         </style>
     </head>'''
 
@@ -165,13 +177,15 @@ def render_centered_html(inner_content):
                 {inner_content}
             </div>
         </div>
+        <footer>
+            Quasarr v.{get_version()}
+        </footer>
     </body>
     '''
     return f'<html>{body}</html>'
 
 
 def render_button(text, button_type="primary", attributes=None):
-    # Map types to classes
     cls = "btn-primary" if button_type == "primary" else "btn-secondary"
     attr_str = ''
     if attributes:

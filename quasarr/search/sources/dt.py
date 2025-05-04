@@ -132,12 +132,10 @@ def dt_feed(shared_state, start_time, request_from, mirror=None):
     return releases
 
 
-def dt_search(shared_state, start_time, request_from, search_string, mirror=None):
+def dt_search(shared_state, start_time, request_from, search_string, mirror=None, season=None, episode=None):
     releases = []
     dt = shared_state.values["config"]("Hostnames").get(hostname.lower())
     password = dt
-
-    season, episode = shared_state.extract_season_episode(search_string)
 
     cat_id = "9" if "Radarr" in request_from else "64"
 
@@ -146,7 +144,7 @@ def dt_search(shared_state, start_time, request_from, search_string, mirror=None
         return releases
 
     try:
-        imdb_id = shared_state.is_imdb_id(search_string.split(" ")[0])
+        imdb_id = shared_state.is_imdb_id(search_string)
         if imdb_id:
             search_string = get_localized_title(shared_state, imdb_id, 'en')
             if not search_string:
@@ -194,13 +192,12 @@ def dt_search(shared_state, start_time, request_from, search_string, mirror=None
                          replace(')', '')
                          )
 
-                if not shared_state.search_string_in_sanitized_title(search_string, title):
+                if not shared_state.is_valid_release(title,
+                                                                     request_from,
+                                                                     search_string,
+                                                                     season,
+                                                                     episode):
                     continue
-
-                if season:
-                    match = shared_state.match_in_title(title, season=season, episode=episode)
-                    if not match:
-                        continue
 
                 try:
                     imdb_id = re.search(r"tt\d+", str(article)).group()

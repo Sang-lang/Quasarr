@@ -26,12 +26,10 @@ def extract_size(size_in_bytes):
     return {"size": size_in_bytes, "sizeunit": "B"}
 
 
-def dd_search(shared_state, start_time, search_string="", mirror=None):
+def dd_search(shared_state, start_time, request_from, search_string="", mirror=None, season=None, episode=None):
     releases = []
     dd = shared_state.values["config"]("Hostnames").get(hostname.lower())
     password = dd
-
-    season, episode = shared_state.extract_season_episode(search_string)
 
     dd_session = retrieve_and_validate_session(shared_state)
     if not dd_session:
@@ -43,7 +41,7 @@ def dd_search(shared_state, start_time, search_string="", mirror=None):
               ' Skipping search!')
         return releases
 
-    imdb_id = shared_state.is_imdb_id(search_string.split(" ")[0])
+    imdb_id = shared_state.is_imdb_id(search_string)
     if imdb_id:
         search_string = get_localized_title(shared_state, imdb_id, 'en')
         if not search_string:
@@ -86,13 +84,12 @@ def dd_search(shared_state, start_time, search_string="", mirror=None):
                 else:
                     title = release.get("release")
 
-                    if not shared_state.search_string_in_sanitized_title(search_string, title):
+                    if not shared_state.is_valid_release(title,
+                                                                         request_from,
+                                                                         search_string,
+                                                                         season,
+                                                                         episode):
                         continue
-
-                    if season:
-                        match = shared_state.match_in_title(title, season=season, episode=episode)
-                        if not match:
-                            continue
 
                     imdb_id = release.get("imdbid", None)
 

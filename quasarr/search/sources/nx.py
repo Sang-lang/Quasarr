@@ -92,12 +92,10 @@ def nx_feed(shared_state, start_time, request_from, mirror=None):
     return releases
 
 
-def nx_search(shared_state, start_time, request_from, search_string, mirror=None):
+def nx_search(shared_state, start_time, request_from, search_string, mirror=None, season=None, episode=None):
     releases = []
     nx = shared_state.values["config"]("Hostnames").get(hostname.lower())
     password = nx
-
-    season, episode = shared_state.extract_season_episode(search_string)
 
     if "Radarr" in request_from:
         valid_type = "movie"
@@ -109,7 +107,7 @@ def nx_search(shared_state, start_time, request_from, search_string, mirror=None
               ' Skipping search!')
         return releases
 
-    imdb_id = shared_state.is_imdb_id(search_string.split(" ")[0])
+    imdb_id = shared_state.is_imdb_id(search_string)
     if imdb_id:
         search_string = get_localized_title(shared_state, imdb_id, 'de')
         if not search_string:
@@ -135,13 +133,12 @@ def nx_search(shared_state, start_time, request_from, search_string, mirror=None
             if item['type'] == valid_type:
                 title = item['name']
                 if title:
-                    if not shared_state.search_string_in_sanitized_title(search_string, title):
+                    if not shared_state.is_valid_release(title,
+                                                                         request_from,
+                                                                         search_string,
+                                                                         season,
+                                                                         episode):
                         continue
-
-                    if season:
-                        match = shared_state.match_in_title(title, season=season, episode=episode)
-                        if not match:
-                            continue
 
                     try:
                         source = f"https://{nx}/release/{item['slug']}"

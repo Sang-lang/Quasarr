@@ -36,36 +36,55 @@ def get_search_results(shared_state, request_from, search_string="", mirror=None
         # Remove trailing year (e.g., 1999, 2021) if present
         search_string = re.sub(r'\s*(19|20)\d{2}$', '', search_string)
 
-        if season and episode:
-            search_string = f"{search_string} S{int(season):02}E{int(episode):02}"
-        elif season:
-            search_string = f"{search_string} S{int(season):02}"
-
         if dd:
-            functions.append(lambda: dd_search(shared_state, start_time, search_string, mirror=mirror))
+            functions.append(lambda: dd_search(shared_state, start_time, request_from, search_string,
+                                               mirror=mirror,
+                                               season=season, episode=episode)
+                             )
         if dt:
-            functions.append(lambda: dt_search(shared_state, start_time, request_from, search_string, mirror=mirror))
+            functions.append(lambda: dt_search(shared_state, start_time, request_from, search_string,
+                                               mirror=mirror,
+                                               season=season, episode=episode)
+                             )
         if dw:
-            functions.append(lambda: dw_search(shared_state, start_time, request_from, search_string, mirror=mirror))
+            functions.append(lambda: dw_search(shared_state, start_time, request_from, search_string,
+                                               mirror=mirror,
+                                               season=season, episode=episode)
+                             )
         if fx:
-            functions.append(lambda: fx_search(shared_state, start_time, search_string, mirror=mirror))
+            functions.append(lambda: fx_search(shared_state, start_time, request_from, search_string,
+                                               mirror=mirror,
+                                               season=season, episode=episode)
+                             )
         if nx:
-            functions.append(lambda: nx_search(shared_state, start_time, request_from, search_string, mirror=mirror))
+            functions.append(lambda: nx_search(shared_state, start_time, request_from, search_string,
+                                               mirror=mirror,
+                                               season=season, episode=episode)
+                             )
         if sf:
-            functions.append(lambda: sf_search(shared_state, start_time, request_from, search_string, mirror=mirror))
+            functions.append(lambda: sf_search(shared_state, start_time, request_from, search_string,
+                                               mirror=mirror,
+                                               season=season, episode=episode)
+                             )
         if sl:
-            functions.append(lambda: sl_search(shared_state, start_time, request_from, search_string, mirror=mirror))
+            functions.append(lambda: sl_search(shared_state, start_time, request_from, search_string,
+                                               mirror=mirror,
+                                               season=season, episode=episode)
+                             )
         if wd:
-            functions.append(lambda: wd_search(shared_state, start_time, request_from, search_string, mirror=mirror))
+            functions.append(lambda: wd_search(shared_state, start_time, request_from, search_string,
+                                               mirror=mirror,
+                                               season=season, episode=episode)
+                             )
     else:
         if dd:
-            functions.append(lambda: dd_search(shared_state, start_time, mirror=mirror))
+            functions.append(lambda: dd_search(shared_state, start_time, request_from, mirror=mirror))
         if dt:
             functions.append(lambda: dt_feed(shared_state, start_time, request_from, mirror=mirror))
         if dw:
             functions.append(lambda: dw_feed(shared_state, start_time, request_from, mirror=mirror))
         if fx:
-            functions.append(lambda: fx_feed(shared_state, start_time, mirror=mirror))
+            functions.append(lambda: fx_feed(shared_state, start_time, request_from, mirror=mirror))
         if nx:
             functions.append(lambda: nx_feed(shared_state, start_time, request_from, mirror=mirror))
         if sf:

@@ -132,12 +132,10 @@ def sl_feed(shared_state, start_time, request_from, mirror=None):
     return releases
 
 
-def sl_search(shared_state, start_time, request_from, search_string, mirror=None):
+def sl_search(shared_state, start_time, request_from, search_string, mirror=None, season=None, episode=None):
     releases = []
     sl = shared_state.values["config"]("Hostnames").get(hostname.lower())
     password = sl
-
-    season, episode = shared_state.extract_season_episode(search_string)
 
     feed_type = "movies" if "Radarr" in request_from else "tv-shows"
 
@@ -146,7 +144,7 @@ def sl_search(shared_state, start_time, request_from, search_string, mirror=None
         return releases
 
     try:
-        imdb_id = shared_state.is_imdb_id(search_string.split(" ")[0])
+        imdb_id = shared_state.is_imdb_id(search_string)
         if imdb_id:
             search_string = get_localized_title(shared_state, imdb_id, 'en') or ''
             search_string = html.unescape(search_string)
@@ -169,13 +167,12 @@ def sl_search(shared_state, start_time, request_from, search_string, mirror=None
                 a = post.find('h1').find('a')
                 title = a.get_text(strip=True)
 
-                if not shared_state.search_string_in_sanitized_title(search_string, title):
+                if not shared_state.is_valid_release(title,
+                                                                     request_from,
+                                                                     search_string,
+                                                                     season,
+                                                                     episode):
                     continue
-
-                if season:
-                    match = shared_state.match_in_title(title, season=season, episode=episode)
-                    if not match:
-                        continue
 
                 source = a['href']
 
