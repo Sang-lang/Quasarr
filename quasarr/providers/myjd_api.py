@@ -39,6 +39,7 @@ import urllib3
 from Cryptodome.Cipher import AES
 
 from quasarr.providers.log import debug
+from quasarr.providers.version import get_version
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 BS = 16
@@ -552,7 +553,7 @@ class Myjdapi:
         """
         self.__request_id = int(time.time() * 1000)
         self.__api_url = "https://api.jdownloader.org"
-        self.__app_key = "http://git.io/vmcsk"
+        self.__app_key = "quasarr"
         self.__api_version = 1
         self.__devices = None
         self.__login_secret = None
@@ -795,10 +796,14 @@ class Myjdapi:
                                                   query[0] + "&".join(query[1:])))
                 ]
             query = query[0] + "&".join(query[1:])
+
+            headers = {
+                "User-Agent": f"Quasarr/{get_version()}"
+            }
             try:
-                encrypted_response = requests.get(api + query, timeout=timeout)
+                encrypted_response = requests.get(api + query, timeout=timeout, headers=headers)
             except Exception:
-                encrypted_response = requests.get(api + query, timeout=timeout, verify=False)
+                encrypted_response = requests.get(api + query, timeout=timeout, headers=headers, verify=False)
                 debug("Could not establish secure connection to JDownloader.")
         else:
             params_request = []
@@ -829,7 +834,7 @@ class Myjdapi:
                     request_url,
                     headers={
                         "Content-Type": "application/aesjson-jd; charset=utf-8",
-                        "User-Agent": "Quasarr"
+                        "User-Agent": f"Quasarr/{get_version()}"
                     },
                     data=encrypted_data,
                     timeout=timeout
@@ -840,7 +845,7 @@ class Myjdapi:
                         request_url,
                         headers={
                             "Content-Type": "application/aesjson-jd; charset=utf-8",
-                            "User-Agent": "Quasarr"
+                            "User-Agent": f"Quasarr/{get_version()}"
                         },
                         data=encrypted_data,
                         timeout=timeout,
