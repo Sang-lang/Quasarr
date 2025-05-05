@@ -7,6 +7,7 @@ import json
 from quasarr.downloads.sources.dd import get_dd_download_links
 from quasarr.downloads.sources.dt import get_dt_download_links
 from quasarr.downloads.sources.dw import get_dw_download_links
+from quasarr.downloads.sources.mb import get_mb_download_links
 from quasarr.downloads.sources.nx import get_nx_download_links
 from quasarr.downloads.sources.sf import get_sf_download_links, resolve_sf_redirect
 from quasarr.downloads.sources.sl import get_sl_download_links
@@ -30,6 +31,7 @@ def download(shared_state, request_from, title, url, mirror, size_mb, password, 
     dd = shared_state.values["config"]("Hostnames").get("dd")
     dt = shared_state.values["config"]("Hostnames").get("dt")
     dw = shared_state.values["config"]("Hostnames").get("dw")
+    mb = shared_state.values["config"]("Hostnames").get("mb")
     nx = shared_state.values["config"]("Hostnames").get("nx")
     sf = shared_state.values["config"]("Hostnames").get("sf")
     sl = shared_state.values["config"]("Hostnames").get("sl")
@@ -68,6 +70,13 @@ def download(shared_state, request_from, title, url, mirror, size_mb, password, 
 
     elif dw and dw.lower() in url.lower():
         links = get_dw_download_links(shared_state, url, mirror, title)
+        info(f'CAPTCHA-Solution required for "{title}" at: "{shared_state.values['external_address']}/captcha"')
+        send_discord_message(shared_state, title=title, case="captcha", imdb_id=imdb_id)
+        blob = json.dumps({"title": title, "links": links, "size_mb": size_mb, "password": password})
+        shared_state.values["database"]("protected").update_store(package_id, blob)
+
+    elif mb and mb.lower() in url.lower():
+        links = get_mb_download_links(shared_state, url, mirror, title)
         info(f'CAPTCHA-Solution required for "{title}" at: "{shared_state.values['external_address']}/captcha"')
         send_discord_message(shared_state, title=title, case="captcha", imdb_id=imdb_id)
         blob = json.dumps({"title": title, "links": links, "size_mb": size_mb, "password": password})
