@@ -140,13 +140,17 @@ def setup_captcha_routes(app):
 
         headers = {key: value for key, value in request.headers.items() if key != 'Host'}
         data = request.body.read()
-        resp = requests.post(target_url, headers=headers, data=data)
+        resp = requests.post(target_url, headers=headers, data=data, verify=False)
 
         response.content_type = resp.headers.get('Content-Type')
 
         content = resp.text
-        content = re.sub(r'<script src="/(.*?)"></script>',
-                         f'<script src="{captcha_values()["url"]}/\\1"></script>', content)
+        content = re.sub(
+            r'''<script\s+src="/(jquery(?:-ui|\.ui\.touch-punch\.min)?\.js)(?:\?[^"]*)?"></script>''',
+            r'''<script src="/captcha/js/\1"></script>''',
+            content
+        )
+
         response.content_type = 'text/html'
         return content
 
@@ -156,17 +160,30 @@ def setup_captcha_routes(app):
 
         headers = {key: value for key, value in request.headers.items() if key != 'Host'}
         data = request.body.read()
-        resp = requests.post(target_url, headers=headers, data=data)
+        resp = requests.post(target_url, headers=headers, data=data, verify=False)
 
         response.content_type = resp.headers.get('Content-Type')
         return resp.content
+
+    @app.get('/captcha/js/<filename>')
+    def serve_local_js(filename):
+        upstream = f"{captcha_values()['url']}/{filename}"
+        try:
+            upstream_resp = requests.get(upstream, verify=False, stream=True)
+            upstream_resp.raise_for_status()
+        except requests.RequestException as e:
+            response.status = 502
+            return f"/* Error proxying {filename}: {e} */"
+
+        response.content_type = 'application/javascript'
+        return upstream_resp.iter_content(chunk_size=8192)
 
     @app.get('/captcha/<captcha_id>/<uuid>/<filename>')
     def proxy_pngs(captcha_id, uuid, filename):
         new_url = f"{captcha_values()["url"]}/captcha/{captcha_id}/{uuid}/{filename}"
 
         try:
-            external_response = requests.get(new_url, stream=True)
+            external_response = requests.get(new_url, stream=True, verify=False)
             external_response.raise_for_status()
             response.content_type = 'image/png'
             response.headers['Content-Disposition'] = f'inline; filename="{filename}"'
@@ -182,7 +199,7 @@ def setup_captcha_routes(app):
         headers = {key: value for key, value in request.headers.items()}
 
         data = request.body.read()
-        resp = requests.post(new_url, headers=headers, data=data)
+        resp = requests.post(new_url, headers=headers, data=data, verify=False)
 
         response.status = resp.status_code
         for header in resp.headers:
