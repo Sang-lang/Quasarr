@@ -7,7 +7,6 @@ import re
 import time
 from base64 import urlsafe_b64encode
 from datetime import datetime, timedelta
-from datetime import datetime as dt
 from urllib.parse import quote, quote_plus
 
 import requests
@@ -32,7 +31,7 @@ def convert_to_rss_date(date_str):
     date_str comes in as "02.05.2025 - 09:04"
     Return RFC‑822 style date with +0000 timezone.
     """
-    parsed = dt.strptime(date_str, "%d.%m.%Y - %H:%M")
+    parsed = datetime.strptime(date_str, "%d.%m.%Y - %H:%M")
     return parsed.strftime("%a, %d %b %Y %H:%M:%S +0000")
 
 
@@ -94,10 +93,10 @@ def _parse_rows(
             # search context contains non-video releases (ebooks, games, etc.)
             if is_search:
                 if not shared_state.is_valid_release(title,
-                                                                     request_from,
-                                                                     search_string,
-                                                                     season,
-                                                                     episode):
+                                                     request_from,
+                                                     search_string,
+                                                     season,
+                                                     episode):
                     continue
 
                 # drop .XXX. unless user explicitly searched xxx
