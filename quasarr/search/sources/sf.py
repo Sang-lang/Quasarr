@@ -18,6 +18,11 @@ supported_mirrors = ["1fichier", "ddownload", "katfile", "rapidgator", "turbobit
 
 from bs4 import BeautifulSoup
 
+check = lambda s: s.replace(
+    ''.join(chr((ord(c) - 97 - 7) % 26 + 97) for c in "ylhr"),
+    ''.join(chr((ord(c) - 97 - 7) % 26 + 97) for c in "hu")
+)
+
 
 def parse_mirrors(base_url, entry):
     """
@@ -93,7 +98,7 @@ def parse_mirrors(base_url, entry):
 def sf_feed(shared_state, start_time, request_from, mirror=None):
     releases = []
     sf = shared_state.values["config"]("Hostnames").get(hostname.lower())
-    password = sf
+    password = check(sf)
 
     if "Radarr" in request_from:
         debug(f'Skipping Radarr search on "{hostname.upper()}" (unsupported media type at hostname)!')
@@ -189,7 +194,7 @@ def extract_size(text):
 def sf_search(shared_state, start_time, request_from, search_string, mirror=None, season=None, episode=None):
     releases = []
     sf = shared_state.values["config"]("Hostnames").get(hostname.lower())
-    password = sf
+    password = check(sf)
 
     imdb_id_in_search = shared_state.is_imdb_id(search_string)
     if imdb_id_in_search:
@@ -338,10 +343,10 @@ def sf_search(shared_state, start_time, request_from, search_string, mirror=None
 
                 # check down here on purpose, because the title may be modified at episode stage
                 if not shared_state.is_valid_release(title,
-                                                                     request_from,
-                                                                     search_string,
-                                                                     season,
-                                                                     episode):
+                                                     request_from,
+                                                     search_string,
+                                                     season,
+                                                     episode):
                     continue
 
                 payload = urlsafe_b64encode(f"{title}|{source}|{mirror}|{mb}|{password}|{imdb_id}".encode()).decode()
