@@ -200,7 +200,15 @@ def setup_arr_routes(app):
                                                       )
 
                     elif mode == 'search':
-                        debug(f'Search in Anime-Order is not supported. Ignoring request: {dict(request.query)}')
+                        # supported params: q
+                        search_param = getattr(request.query, 'q', '')
+                        if search_param:
+                            releases = get_search_results(shared_state, request_from,
+                                                          search_string=search_param,
+                                                          mirror=mirror
+                                                          )
+                        else:
+                            debug(f'No search parameter provided. Ignoring request: {dict(request.query)}')
 
                     elif mode == 'tvsearch':
                         # supported params: q, imdbid, season and ep
