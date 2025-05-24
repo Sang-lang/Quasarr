@@ -132,11 +132,13 @@ def get_packages(shared_state):
                 "saveTo": "/"
             }
 
+            error = data.get("error", "Unknown error")
+
             packages.append({
                 "details": details,
                 "location": "history",
                 "type": "failed",
-                "error": data["error"],
+                "error": error,
                 "comment": package_id,
                 "uuid": package_id
             })
