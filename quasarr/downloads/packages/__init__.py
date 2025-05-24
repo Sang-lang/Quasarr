@@ -121,6 +121,11 @@ def get_packages(shared_state):
             package_id = package[0]
 
             data = json.loads(package[1])
+            try:
+                if type(data) is str:
+                    data = json.loads(data)
+            except json.JSONDecodeError:
+                pass
             details = {
                 "name": data["title"],
                 "bytesLoaded": 0,
@@ -131,7 +136,7 @@ def get_packages(shared_state):
                 "details": details,
                 "location": "history",
                 "type": "failed",
-                "error": "Too many failed attempts by SponsorsHelper",
+                "error": data["error"],
                 "comment": package_id,
                 "uuid": package_id
             })

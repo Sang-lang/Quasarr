@@ -63,15 +63,20 @@ def setup_arr_routes(app):
             password = root.find(".//file").attrib.get("password")
             imdb_id = root.find(".//file").attrib.get("imdb_id")
 
-            info(f"Attempting download for {title}")
+            info(f'Attempting download for "{title}"')
             request_from = request.headers.get('User-Agent')
-            package_id = download(shared_state, request_from, title, url, mirror, size_mb, password, imdb_id)
+            downloaded = download(shared_state, request_from, title, url, mirror, size_mb, password, imdb_id)
+            try:
+                success = downloaded["success"]
+                package_id = downloaded["package_id"]
 
-            if package_id:
-                info(f"{title} added successfully!")
+                if success:
+                    info(f'"{title}" added successfully!')
+                else:
+                    info(f'"{title}" added unsuccessfully! See log for details.')
                 nzo_ids.append(package_id)
-            else:
-                info(f"{title} could not be added!")
+            except KeyError:
+                info(f'Failed to download "{title}" - no package_id returned')
 
         return {
             "status": True,
@@ -200,7 +205,15 @@ def setup_arr_routes(app):
                                                       )
 
                     elif mode == 'search':
-                        debug(f'Search in Anime-Order is not supported. Ignoring request: {dict(request.query)}')
+                        # supported params: q
+                        search_param = getattr(request.query, 'q', '')
+                        if search_param:
+                            releases = get_search_results(shared_state, request_from,
+                                                          search_string=search_param,
+                                                          mirror=mirror
+                                                          )
+                        else:
+                            debug(f'No search parameter provided. Ignoring request: {dict(request.query)}')
 
                     elif mode == 'tvsearch':
                         # supported params: q, imdbid, season and ep

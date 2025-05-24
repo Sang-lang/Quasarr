@@ -22,6 +22,7 @@ def download(shared_state, request_from, title, url, mirror, size_mb, password, 
         category = "tv"
 
     package_id = f"Quasarr_{category}_{str(hash(title + url)).replace('-', '')}"
+    success = True
 
     if imdb_id is not None and imdb_id.lower() == "none":
         imdb_id = None
@@ -41,11 +42,13 @@ def download(shared_state, request_from, title, url, mirror, size_mb, password, 
             send_discord_message(shared_state, title=title, case="unprotected", imdb_id=imdb_id)
             added = shared_state.download_package(links, title, password, package_id)
             if not added:
-                info(f"Failed to add {title} to linkgrabber")
-                package_id = None
+                fail(title, package_id, shared_state,
+                     reason=f'Failed to add {len(links)} links for "{title}" to linkgrabber')
+                success = False
         else:
-            info(f"Found 0 links decrypting {title} on DD")
-            package_id = None
+            fail(title, package_id, shared_state,
+                 reason=f'Offline / no links found for "{title}" on DD - "{url}"')
+            success = False
 
     elif dt and dt.lower() in url.lower():
         links = get_dt_download_links(shared_state, url, mirror, title)
@@ -54,11 +57,13 @@ def download(shared_state, request_from, title, url, mirror, size_mb, password, 
             send_discord_message(shared_state, title=title, case="unprotected", imdb_id=imdb_id)
             added = shared_state.download_package(links, title, password, package_id)
             if not added:
-                info(f"Failed to add {title} to linkgrabber")
-                package_id = None
+                fail(title, package_id, shared_state,
+                     reason=f'Failed to add {len(links)} links for "{title}" to linkgrabber')
+                success = False
         else:
-            info(f"Found 0 links decrypting {title} on DT")
-            package_id = None
+            fail(title, package_id, shared_state,
+                 reason=f'Offline / no links found for "{title}" on DT - "{url}"')
+            success = False
 
 
     elif dw and dw.lower() in url.lower():
@@ -75,11 +80,13 @@ def download(shared_state, request_from, title, url, mirror, size_mb, password, 
             send_discord_message(shared_state, title=title, case="unprotected", imdb_id=imdb_id)
             added = shared_state.download_package(links, title, password, package_id)
             if not added:
-                info(f"Failed to add {title} to linkgrabber")
-                package_id = None
+                fail(title, package_id, shared_state,
+                     reason=f'Failed to add {len(links)} links for "{title}" to linkgrabber')
+                success = False
         else:
-            info(f"Found 0 links decrypting {title} on NX")
-            package_id = None
+            fail(title, package_id, shared_state,
+                 reason=f'Offline / no links found for "{title}" on NX - "{url}"')
+            success = False
 
     elif sf and sf.lower() in url.lower():
         if url.startswith(f"https://{sf}/external"):  # from interactive search
@@ -98,8 +105,9 @@ def download(shared_state, request_from, title, url, mirror, size_mb, password, 
                  "mirror": mirror})
             shared_state.values["database"]("protected").update_store(package_id, blob)
         else:
-            info(f"Failed to get download link from SF for {title} - {url}")
-            package_id = None
+            fail(title, package_id, shared_state,
+                 reason=f'Failed to get download link from SF for "{title}" - "{url}"')
+            success = False
 
     elif sl and sl.lower() in url.lower():
         data = get_sl_download_links(shared_state, url, mirror, title)
@@ -111,11 +119,13 @@ def download(shared_state, request_from, title, url, mirror, size_mb, password, 
             send_discord_message(shared_state, title=title, case="unprotected", imdb_id=imdb_id)
             added = shared_state.download_package(links, title, password, package_id)
             if not added:
-                info(f"Failed to add {title} to linkgrabber")
-                package_id = None
+                fail(title, package_id, shared_state,
+                     reason=f'Failed to add {len(links)} links for "{title}" to linkgrabber')
+                success = False
         else:
-            info(f"Found 0 links decrypting {title} on SL")
-            package_id = None
+            fail(title, package_id, shared_state,
+                 reason=f'Offline / no links found for "{title}" on SL - "{url}"')
+            success = False
 
     elif wd and wd.lower() in url.lower():
         data = get_wd_download_links(shared_state, url, mirror, title)
@@ -128,8 +138,9 @@ def download(shared_state, request_from, title, url, mirror, size_mb, password, 
             blob = json.dumps({"title": title, "links": links, "size_mb": size_mb, "password": password})
             shared_state.values["database"]("protected").update_store(package_id, blob)
         else:
-            info(f"Found 0 links decrypting {title} on WD")
-            package_id = None
+            fail(title, package_id, shared_state,
+                 reason=f'Offline / no links found for "{title}" on WD - "{url}"')
+            success = False
 
     elif "filecrypt".lower() in url.lower():
         info(f'CAPTCHA-Solution required for "{title}" at: "{shared_state.values['external_address']}/captcha"')
@@ -139,7 +150,26 @@ def download(shared_state, request_from, title, url, mirror, size_mb, password, 
         shared_state.values["database"]("protected").update_store(package_id, blob)
 
     else:
-        package_id = None
-        info(f"Could not parse URL for {title} - {url}")
+        info(f'Could not parse URL for "{title}" - "{url}"')
+        success = False
 
-    return package_id
+    return {
+        "success": success,
+        "package_id": package_id
+    }
+
+
+def fail(title, package_id, shared_state, reason="Offline / no links found"):
+    try:
+        info(f"Reason for failure: {reason}")
+        blob = json.dumps({"title": title, "error": reason})
+        stored = shared_state.get_db("failed").store(package_id, json.dumps(blob))
+        if stored:
+            info(f'Package "{title}" marked as failed!"')
+            return True
+        else:
+            info(f'Failed to mark package "{title}" as failed!"')
+            return False
+    except Exception as e:
+        info(f'Error marking package "{package_id}" as failed: {e}')
+        return False

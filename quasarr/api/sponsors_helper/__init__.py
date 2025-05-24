@@ -6,6 +6,7 @@ import json
 
 from bottle import request, abort
 
+from quasarr.downloads import fail
 from quasarr.providers import shared_state
 from quasarr.providers.log import info
 from quasarr.providers.notifications import send_discord_message
@@ -30,7 +31,6 @@ def setup_sponsors_helper_routes(app):
                 links = data["links"]
                 mirror = None if (mirror := data.get('mirror')) == "None" else mirror
                 password = data["password"]
-                mirror = None if (mirror := data.get('mirror')) == "None" else mirror
 
             return {
                 "to_decrypt": {
@@ -39,7 +39,6 @@ def setup_sponsors_helper_routes(app):
                     "url": links,
                     "mirror": mirror,
                     "password": password,
-                    "mirror": mirror,
                     "max_attempts": 3
                 }
             }
@@ -81,16 +80,16 @@ def setup_sponsors_helper_routes(app):
 
             data = json.loads(shared_state.get_db("protected").retrieve(package_id))
             title = data.get('title')
-            moved = shared_state.get_db("failed").store(package_id, json.dumps(data))
-            if moved and title:
-                deleted = shared_state.get_db("protected").delete(package_id)
-                if deleted:
-                    send_discord_message(shared_state, title=title, case="failed")
-                    info(f"Package {title} with ID {package_id} marked as failed!")
-                    return f'Package "{title}" with ID "{package_id} marked as failed!"'
 
+            if package_id:
+                info(f'Marking package "{title}" with ID "{package_id}" as failed')
+                failed = fail(title, package_id, shared_state, reason="Too many failed attempts by SponsorsHelper")
+                if failed:
+                    shared_state.get_db("protected").delete(package_id)
+                    send_discord_message(shared_state, title=title, case="failed")
+                    return f'Package "{title}" with ID "{package_id} marked as failed!"'
         except Exception as e:
-            info(f"Error marking package as failed: {e}")
+            info(f"Error moving to failed: {e}")
 
         return abort(500, "Failed")
 
