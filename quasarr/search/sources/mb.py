@@ -115,13 +115,10 @@ def _parse_posts(soup, shared_state, url_base, password, mirror_filter,
                 mb = shared_state.convert_to_mb(sz)
                 size_bytes = mb * 1024 * 1024
 
-            if is_search:
-                link = source
-            else:
-                payload = urlsafe_b64encode(
-                    f"{title}|{source}|{mirror_filter}|{mb}|{password}|{imdb_id}".encode()
-                ).decode()
-                link = f"{shared_state.values['internal_address']}/download/?payload={payload}"
+            payload = urlsafe_b64encode(
+                f"{title}|{source}|{mirror_filter}|{mb}|{password}|{imdb_id}".encode()
+            ).decode()
+            link = f"{shared_state.values['internal_address']}/download/?payload={payload}"
 
             releases.append({
                 "details": {

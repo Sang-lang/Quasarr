@@ -139,10 +139,10 @@ def get_dd_download_links(shared_state, mirror, search_string):
                     links = [link["url"] for link in filtered_links]
                     break
             except Exception as e:
-                info(f"Error parsing DD feed: {e}")
+                info(f"Error parsing DD download: {e}")
                 continue
 
     except Exception as e:
-        info(f"Error loading DD feed: {e}")
+        info(f"Error loading DD download: {e}")
 
     return links

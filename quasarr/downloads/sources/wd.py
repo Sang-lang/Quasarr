@@ -34,11 +34,11 @@ def resolve_wd_redirect(url, user_agent):
 
 
 def get_wd_download_links(
-    shared_state,
-    url,
-    mirror=None,
-    title=None,
-    include_details=False
+        shared_state,
+        url,
+        mirror=None,
+        title=None,
+        include_details=False
 ):
     """
     Fetches the download links from the WD detail page by scraping the
@@ -106,7 +106,7 @@ def get_wd_download_links(
                             hoster = cls.split("-", 1)[1]
                             break
 
-                if mirror and mirror not in hoster:
+                if mirror and mirror.lower() not in hoster.lower():
                     debug(f'Skipping link from "{hoster}" (not the desired mirror "{mirror}")!')
                     continue
 
