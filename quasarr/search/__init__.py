@@ -7,6 +7,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from quasarr.providers.log import info
+from quasarr.search.sources.al import al_feed, al_search
 from quasarr.search.sources.dd import dd_search
 from quasarr.search.sources.dt import dt_feed, dt_search
 from quasarr.search.sources.dw import dw_feed, dw_search
@@ -21,6 +22,7 @@ from quasarr.search.sources.wd import wd_feed, wd_search
 def get_search_results(shared_state, request_from, search_string="", mirror=None, season="", episode=""):
     results = []
 
+    al = shared_state.values["config"]("Hostnames").get("al")
     dd = shared_state.values["config"]("Hostnames").get("dd")
     dt = shared_state.values["config"]("Hostnames").get("dt")
     dw = shared_state.values["config"]("Hostnames").get("dw")
@@ -38,6 +40,10 @@ def get_search_results(shared_state, request_from, search_string="", mirror=None
         # Remove trailing year (e.g., 1999, 2021) if present
         search_string = re.sub(r'\s*(19|20)\d{2}$', '', search_string)
 
+        if al:
+            functions.append(lambda: al_search(shared_state, start_time, request_from, search_string,
+                                               mirror=mirror,
+                                               season=season, episode=episode))
         if dd:
             functions.append(lambda: dd_search(shared_state, start_time, request_from, search_string,
                                                mirror=mirror,
@@ -76,6 +82,10 @@ def get_search_results(shared_state, request_from, search_string="", mirror=None
                                                mirror=mirror,
                                                season=season, episode=episode))
     else:
+        if al:
+            functions.append(lambda: al_feed(shared_state, start_time, request_from,
+                                             mirror=mirror))
+
         if dd:
             functions.append(lambda: dd_search(shared_state, start_time, request_from,
                                                mirror=mirror))

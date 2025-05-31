@@ -26,6 +26,7 @@ class Config(object):
             ("device", "str", ""),
         ],
         'Hostnames': [
+            ("al", "secret", ""),
             ("dd", "secret", ""),
             ("dt", "secret", ""),
             ("dw", "secret", ""),
@@ -35,6 +36,13 @@ class Config(object):
             ("sf", "secret", ""),
             ("sl", "secret", ""),
             ("wd", "secret", "")
+        ],
+        'FlareSolverr': [
+            ("url", "str", ""),
+        ],
+        'AL': [
+            ("user", "secret", ""),
+            ("password", "secret", "")
         ],
         'DD': [
             ("user", "secret", ""),

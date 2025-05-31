@@ -26,7 +26,7 @@ services:
       - TZ=Europe/Berlin
       - CONFIG_VOLUMES=/config/volumes
     ports:
-      - 9091:7878
+      - "9091:7878"
     volumes:
       - ${CONFIG_VOLUMES}/radarr/config:/config
       - ${CONFIG_VOLUMES}/radarr/movies:/movies
@@ -46,7 +46,7 @@ services:
       - TZ=Europe/Berlin
       - CONFIG_VOLUMES=/config/volumes
     ports:
-      - 9092:8989
+      - "9092:8989"
     volumes:
       - ${CONFIG_VOLUMES}/sonarr/config:/config
       - ${CONFIG_VOLUMES}/sonarr/tv:/tv
@@ -55,4 +55,13 @@ services:
       options:
         max-size: "10m"
         max-file: "1"
+    restart: unless-stopped
+
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: flaresolverr
+    environment:
+      - TZ=Europe/Berlin
+    ports:
+      - "8989:8191"
     restart: unless-stopped
