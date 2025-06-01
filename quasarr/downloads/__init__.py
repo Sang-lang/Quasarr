@@ -4,6 +4,7 @@
 
 import json
 
+from quasarr.downloads.sources.al import get_al_download_links
 from quasarr.downloads.sources.dd import get_dd_download_links
 from quasarr.downloads.sources.dt import get_dt_download_links
 from quasarr.downloads.sources.dw import get_dw_download_links
@@ -28,6 +29,7 @@ def download(shared_state, request_from, title, url, mirror, size_mb, password, 
     if imdb_id is not None and imdb_id.lower() == "none":
         imdb_id = None
 
+    al = shared_state.values["config"]("Hostnames").get("al")
     dd = shared_state.values["config"]("Hostnames").get("dd")
     dt = shared_state.values["config"]("Hostnames").get("dt")
     dw = shared_state.values["config"]("Hostnames").get("dw")
@@ -37,7 +39,22 @@ def download(shared_state, request_from, title, url, mirror, size_mb, password, 
     sl = shared_state.values["config"]("Hostnames").get("sl")
     wd = shared_state.values["config"]("Hostnames").get("wd")
 
-    if dd and dd.lower() in url.lower():
+    if al and al.lower() in url.lower():
+        links = get_al_download_links(shared_state, url, mirror, title)
+        if links:
+            info(f"Decrypted {len(links)} download links for {title}")
+            send_discord_message(shared_state, title=title, case="unprotected", imdb_id=imdb_id)
+            added = shared_state.download_package(links, title, password, package_id)
+            if not added:
+                fail(title, package_id, shared_state,
+                     reason=f'Failed to add {len(links)} links for "{title}" to linkgrabber')
+                success = False
+        else:
+            fail(title, package_id, shared_state,
+                 reason=f'Offline / no links found for "{title}" on DT - "{url}"')
+            success = False
+
+    elif dd and dd.lower() in url.lower():
         links = get_dd_download_links(shared_state, mirror, title)
         if links:
             info(f"Decrypted {len(links)} download links for {title}")

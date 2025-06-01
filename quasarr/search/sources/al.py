@@ -2,18 +2,15 @@
 # Quasarr
 # Project by https://github.com/rix1337
 
-import base64
-import pickle
 import re
 import time
-import urllib.parse
 from base64 import urlsafe_b64encode
 from datetime import datetime, timedelta
 from html import unescape
 
-import requests
 from bs4 import BeautifulSoup
 
+from quasarr.downloads.sources.al import retrieve_and_validate_session, invalidate_session
 from quasarr.providers.imdb_metadata import get_localized_title
 from quasarr.providers.log import info, debug
 
@@ -73,110 +70,6 @@ def extract_size(text):
         return {"size": size, "sizeunit": unit}
     else:
         raise ValueError(f"Invalid size format: {text}")
-
-
-def create_and_persist_session(shared_state):
-    cfg = shared_state.values["config"]("Hostnames")
-    host = cfg.get(hostname)
-    credentials_cfg = shared_state.values["config"](hostname.upper())
-    user = credentials_cfg.get("user")
-    pw = credentials_cfg.get("password")
-
-    sess = requests.Session()
-    sess.headers.update({'User-Agent': shared_state.values["user_agent"]})
-
-    # todo check if sponsors active and flaresolverr is available else return error
-
-    # Prime cookies via FlareSolverr
-    try:
-        info(f'Priming "{hostname}" session via FlareSolverr...')
-        flaresolverr_url = "http://localhost:8989/v1"  # ToDo make configurable
-        fs_headers = {"Content-Type": "application/json"}
-        fs_payload = {
-            "cmd": "request.get",
-            "url": f"https://www.{host}/",
-            "maxTimeout": 60000,
-            "headers": {
-                "User-Agent": shared_state.values["user_agent"]
-            }
-        }
-
-        fs_resp = requests.post(flaresolverr_url, headers=fs_headers, json=fs_payload, timeout=30)
-        fs_resp.raise_for_status()
-
-        fs_json = fs_resp.json()
-        # Check if FlareSolverr actually solved the challenge
-        if fs_json.get("status") != "ok" or "solution" not in fs_json:
-            info(f"{hostname}: FlareSolverr did not return a valid solution")
-            return None
-
-        solution = fs_json["solution"]
-        # Extract any cookies returned by FlareSolverr and add them into our session
-        for ck in solution.get("cookies", []):
-            name = ck.get("name")
-            value = ck.get("value")
-            domain = ck.get("domain")
-            path = ck.get("path", "/")
-            # Set cookie on the session (ignoring expires/secure/httpOnly)
-            sess.cookies.set(name, value, domain=domain, path=path)
-
-    except Exception as e:
-        debug(f'Could not prime "{hostname}" session via FlareSolverr: {e}')
-        return None
-
-    if user and pw:
-        data = {
-            "identity": user,
-            "password": pw,
-            "remember": "1"
-        }
-        encoded_data = urllib.parse.urlencode(data)
-
-        login_headers = {
-            'User-Agent': shared_state.values["user_agent"],
-            "Content-Type": "application/x-www-form-urlencoded"
-        }
-
-        r = sess.post(f'https://www.{host}/auth/signin',
-                      data=encoded_data,
-                      headers=login_headers,
-                      timeout=10)
-
-        if r.status_code != 200 or "invalid" in r.text.lower():
-            info(f'"{hostname}": login failed: {r.status_code} - {r.text}')
-            return None
-    else:
-        info(f'"{hostname}": no credentials provided, skipping login')
-        return None
-
-    blob = pickle.dumps(sess)
-    token = base64.b64encode(blob).decode("utf-8")
-    shared_state.values["database"]("sessions").update_store(hostname, token)
-    return sess
-
-
-def retrieve_and_validate_session(shared_state):
-    db = shared_state.values["database"]("sessions")
-    token = db.retrieve(hostname)
-    if not token:
-        return create_and_persist_session(shared_state)
-
-    try:
-        blob = base64.b64decode(token.encode("utf-8"))
-        sess = pickle.loads(blob)
-        if not isinstance(sess, requests.Session):
-            raise ValueError("Not a Session")
-    except Exception as e:
-        debug(f"{hostname}: session load failed: {e}")
-        return create_and_persist_session(shared_state)
-
-    return sess
-
-
-def invalidate_session(shared_state):
-    db = shared_state.values["database"]("sessions")
-    db.delete(hostname)
-    debug(f"{hostname}: session invalidated and removed from database.")
 
 
 def sanitize_title(text: str) -> str:
