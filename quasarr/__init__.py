@@ -19,7 +19,8 @@ from quasarr.providers import shared_state, version
 from quasarr.providers.log import info, debug
 from quasarr.providers.notifications import send_discord_message
 from quasarr.storage.config import Config, get_clean_hostnames
-from quasarr.storage.setup import path_config, hostnames_config, hostname_credentials_config, jdownloader_config
+from quasarr.storage.setup import path_config, hostnames_config, hostname_credentials_config, flaresolverr_config, \
+    jdownloader_config
 from quasarr.storage.sqlite_database import DataBase
 
 
@@ -46,7 +47,8 @@ def run():
 
         print("\n===== Recommended Services =====")
         print('For convenient universal premium downloads use: "https://linksnappy.com/?ref=397097"')
-        print('Sponsors get automated CAPTCHA solutions: "https://github.com/rix1337/Quasarr?tab=readme-ov-file#sponsorshelper"')
+        print(
+            'Sponsors get automated CAPTCHA solutions: "https://github.com/rix1337/Quasarr?tab=readme-ov-file#sponsorshelper"')
 
         print("\n===== Startup Info =====")
         port = int('8080')
@@ -152,6 +154,18 @@ def run():
             hostnames = get_clean_hostnames(shared_state)
         print(f"You have [{len(hostnames)} of {len(Config._DEFAULT_CONFIG['Hostnames'])}] supported hostnames set up")
         print(f"For efficiency it is recommended to set up as few hostnames as needed.")
+
+        al = Config('Hostnames').get('al')
+        if al:
+            flaresolverr_url = Config('FlareSolverr').get('url')
+            if not flaresolverr_url:
+                flaresolverr_config(shared_state)
+            else:
+                print(f'Using Flaresolverr URL: "{flaresolverr_url}"')
+            user = Config('AL').get('user')
+            password = Config('AL').get('password')
+            if not user or not password:
+                hostname_credentials_config(shared_state, "AL", al)
 
         dd = Config('Hostnames').get('dd')
         if dd:

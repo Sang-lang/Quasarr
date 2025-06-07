@@ -7,6 +7,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from quasarr.providers.log import info
+from quasarr.search.sources.al import al_feed, al_search
 from quasarr.search.sources.dd import dd_search
 from quasarr.search.sources.dt import dt_feed, dt_search
 from quasarr.search.sources.dw import dw_feed, dw_search
@@ -21,6 +22,7 @@ from quasarr.search.sources.wd import wd_feed, wd_search
 def get_search_results(shared_state, request_from, search_string="", mirror=None, season="", episode=""):
     results = []
 
+    al = shared_state.values["config"]("Hostnames").get("al")
     dd = shared_state.values["config"]("Hostnames").get("dd")
     dt = shared_state.values["config"]("Hostnames").get("dt")
     dw = shared_state.values["config"]("Hostnames").get("dw")
@@ -38,6 +40,10 @@ def get_search_results(shared_state, request_from, search_string="", mirror=None
         # Remove trailing year (e.g., 1999, 2021) if present
         search_string = re.sub(r'\s*(19|20)\d{2}$', '', search_string)
 
+        if al:
+            functions.append(lambda: al_search(shared_state, start_time, request_from, search_string,
+                                               mirror=mirror,
+                                               season=season, episode=episode))
         if dd:
             functions.append(lambda: dd_search(shared_state, start_time, request_from, search_string,
                                                mirror=mirror,
@@ -76,41 +82,35 @@ def get_search_results(shared_state, request_from, search_string="", mirror=None
                                                mirror=mirror,
                                                season=season, episode=episode))
     else:
+        if al:
+            functions.append(lambda: al_feed(shared_state, start_time, request_from, mirror=mirror))
+
         if dd:
-            functions.append(lambda: dd_search(shared_state, start_time, request_from,
-                                               mirror=mirror))
+            functions.append(lambda: dd_search(shared_state, start_time, request_from, mirror=mirror))
 
         if dt:
-            functions.append(lambda: dt_feed(shared_state, start_time, request_from,
-                                             mirror=mirror))
+            functions.append(lambda: dt_feed(shared_state, start_time, request_from, mirror=mirror))
 
         if dw:
-            functions.append(lambda: dw_feed(shared_state, start_time, request_from,
-                                             mirror=mirror))
+            functions.append(lambda: dw_feed(shared_state, start_time, request_from, mirror=mirror))
 
         if fx:
-            functions.append(lambda: fx_feed(shared_state, start_time, request_from,
-                                             mirror=mirror))
+            functions.append(lambda: fx_feed(shared_state, start_time, mirror=mirror))
 
         if mb:
-            functions.append(lambda: mb_feed(shared_state, start_time, request_from,
-                                             mirror=mirror))
+            functions.append(lambda: mb_feed(shared_state, start_time, request_from, mirror=mirror))
 
         if nx:
-            functions.append(lambda: nx_feed(shared_state, start_time, request_from,
-                                             mirror=mirror))
+            functions.append(lambda: nx_feed(shared_state, start_time, request_from, mirror=mirror))
 
         if sf:
-            functions.append(lambda: sf_feed(shared_state, start_time, request_from,
-                                             mirror=mirror))
+            functions.append(lambda: sf_feed(shared_state, start_time, request_from, mirror=mirror))
 
         if sl:
-            functions.append(lambda: sl_feed(shared_state, start_time, request_from,
-                                             mirror=mirror))
+            functions.append(lambda: sl_feed(shared_state, start_time, request_from, mirror=mirror))
 
         if wd:
-            functions.append(lambda: wd_feed(shared_state, start_time, request_from,
-                                             mirror=mirror))
+            functions.append(lambda: wd_feed(shared_state, start_time, request_from, mirror=mirror))
 
     stype = f'search phrase "{search_string}"' if search_string else "feed search"
     info(f'Starting {len(functions)} search functions for {stype}... This may take some time.')

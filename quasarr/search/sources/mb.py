@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Quasarr
-# Project by https://github.com/rix1337 (business logic unchanged)
+# Project by https://github.com/rix1337
 
 import html
 import re

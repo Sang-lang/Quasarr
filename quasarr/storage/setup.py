@@ -5,10 +5,12 @@
 import os
 import sys
 
+import requests
 from bottle import Bottle, request
 
 import quasarr
 import quasarr.downloads.sources.dd
+from quasarr.downloads.sources import al
 from quasarr.downloads.sources import dd
 from quasarr.downloads.sources import nx
 from quasarr.providers.html_templates import render_button, render_form, render_success, render_fail
@@ -145,7 +147,7 @@ def hostname_credentials_config(shared_state, shorthand, domain):
         return render_form(f"Set User and Password for {shorthand}", form_html)
 
     @app.post("/api/credentials/<sh>")
-    def set_nx_credentials(sh):
+    def set_credentials(sh):
         user = request.forms.get('user')
         password = request.forms.get('password')
         config = Config(shorthand)
@@ -154,6 +156,10 @@ def hostname_credentials_config(shared_state, shorthand, domain):
             config.save("user", user)
             config.save("password", password)
 
+            if sh.lower() == "al":
+                if al.create_and_persist_session(shared_state):
+                    quasarr.providers.web_server.temp_server_success = True
+                    return render_success(f"{sh} credentials set successfully", 5)
             if sh.lower() == "dd":
                 if dd.create_and_persist_session(shared_state):
                     quasarr.providers.web_server.temp_server_success = True
@@ -172,6 +178,59 @@ def hostname_credentials_config(shared_state, shorthand, domain):
         f'Starting web server for config at: "{shared_state.values['internal_address']}".')
     info(f"If needed register here: 'https://{domain}'")
     info("Please set your credentials now, to allow Quasarr to launch!")
+    return Server(app, listen='0.0.0.0', port=shared_state.values['port']).serve_temporarily()
+
+
+def flaresolverr_config(shared_state):
+    app = Bottle()
+
+    @app.get('/')
+    def url_form():
+        form_content = '''
+        <span><a href="https://github.com/FlareSolverr/FlareSolverr?tab=readme-ov-file#installation">A local instance</a>
+        must be running and reachable to Quasarr!</span><br><br>
+        <label for="url">FlareSolverr URL</label>
+        <input type="text" id="url" name="url" placeholder="http://192.168.0.1:8191/v1"><br>
+        '''
+        form_html = f'''
+        <form action="/api/flaresolverr" method="post">
+            {form_content}
+            {render_button("Save", "primary", {"type": "submit"})}
+        </form>
+        '''
+        return render_form("Set FlareSolverr URL", form_html)
+
+    @app.post('/api/flaresolverr')
+    def set_flaresolverr_url():
+        url = request.forms.get('url').strip()
+        config = Config("FlareSolverr")
+
+        if url:
+            try:
+                headers = {"Content-Type": "application/json"}
+                data = {
+                    "cmd": "request.get",
+                    "url": "http://www.google.com/",
+                    "maxTimeout": 30000
+                }
+                response = requests.post(url, headers=headers, json=data, timeout=30)
+                if response.status_code == 200:
+                    config.save("url", url)
+                    print(f'Using Flaresolverr URL: "{url}"')
+                    quasarr.providers.web_server.temp_server_success = True
+                    return render_success("FlareSolverr URL saved successfully!", 5)
+            except requests.RequestException:
+                pass
+
+        # on failure, clear any existing value and notify user
+        config.save("url", "")
+        return render_fail("Could not reach FlareSolverr at that URL (expected HTTP 200).")
+
+    info(
+        '"flaresolverr" URL is required for proper operation. '
+        f'Starting web server for config at: "{shared_state.values["internal_address"]}".'
+    )
+    info("Please enter your FlareSolverr URL now.")
     return Server(app, listen='0.0.0.0', port=shared_state.values['port']).serve_temporarily()
 
 
