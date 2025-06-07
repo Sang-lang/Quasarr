@@ -7,6 +7,7 @@ import time
 from base64 import urlsafe_b64encode
 from datetime import datetime, timedelta
 from html import unescape
+from urllib.parse import urljoin, quote_plus
 
 from bs4 import BeautifulSoup
 
@@ -72,22 +73,7 @@ def extract_size(text):
         raise ValueError(f"Invalid size format: {text}")
 
 
-def sanitize_title(text: str) -> str:
-    replacements = {
-        'ä': 'ae', 'ö': 'oe', 'ü': 'ue',
-        'Ä': 'Ae', 'Ö': 'Oe', 'Ü': 'Ue',
-        'ß': 'ss'
-    }
-    for k, v in replacements.items():
-        text = text.replace(k, v)
-
-    # Remove any leading/trailing dots and replace multiple dots with a single dot
-    title = re.sub(r"\.{2,}", ".", text).strip(".").replace(".-.", "-")
-
-    return re.sub(r'[^A-Za-z0-9\.-]', '', title)
-
-
-def guess_title(raw_base_title, release_type, block):
+def guess_title(shared_state, raw_base_title, release_type, block):
     """
     This is required as AL often does not provide proper titles in the feed or even details page.
     Reconstructed titles will rarely match the original release names, as:
@@ -116,6 +102,8 @@ def guess_title(raw_base_title, release_type, block):
     elif release_type == "series":
         # Default to Season 1 if it's a series and no season is mentioned
         season_str = "S01"
+        if "rebellion r2" in base_title.lower():
+            season_str = "S02"
 
     # Replace spaces → dots (colons removed later by sanitize_title)
     formatted_base = base_title.replace(" ", ".")
@@ -143,11 +131,10 @@ def guess_title(raw_base_title, release_type, block):
     if m_res:
         res_text = m_res.group(1)
     else:
-        # Default to 480p if no resolution is found
-        res_text = "480p"
+        # Default to 1080p if no resolution is found
+        res_text = "1080p"
 
     # Extract release group, if present
-    grp_text = ""
     span = block.find("span")
     if span:
         raw_grp_full = span.get_text()  # e.g. "Release Group: GroupName"
@@ -222,6 +209,8 @@ def guess_title(raw_base_title, release_type, block):
     if res_text:
         parts.append(res_text)
 
+    parts.append("WEB-DL.x264")  # default to most common source
+
     # Join with dots
     candidate = ".".join(parts)
 
@@ -230,14 +219,20 @@ def guess_title(raw_base_title, release_type, block):
         candidate = f"{candidate}-{grp_text}"
 
     # Finally, sanitize the entire title: replace umlauts/ß, then strip invalid chars
-    sanitized_title = sanitize_title(candidate)
+    sanitized_title = shared_state.sanitize_title(candidate)
     return sanitized_title
+
+
+def get_release_id(tag):
+    match = re.search(r"release\s+(\d+):", tag.get_text(strip=True), re.IGNORECASE)
+    if match:
+        return int(match.group(1))
+    return 0
 
 
 def al_feed(shared_state, start_time, request_from, mirror=None):
     releases = []
     host = shared_state.values["config"]("Hostnames").get(hostname)
-    password = host
 
     headers = {
         'User-Agent': shared_state.values["user_agent"],
@@ -257,7 +252,7 @@ def al_feed(shared_state, start_time, request_from, mirror=None):
         return releases
 
     try:
-        r = sess.get(f'https://{host}/', timeout=10, headers=headers)
+        r = sess.get(f'https://www.{host}/', timeout=10, headers=headers)
         r.raise_for_status()
     except Exception as e:
         info(f"{hostname}: could not fetch feed: {e}")
@@ -323,28 +318,30 @@ def al_feed(shared_state, start_time, request_from, mirror=None):
             # Each of these signifies an individual release block
             mt_blocks = tr.find_all("div", class_="mt10")
             for block in mt_blocks:
-                final_title = guess_title(raw_base_title, release_type, block)
+                release_id = get_release_id(block)
+                final_title = guess_title(shared_state, raw_base_title, release_type, block)
 
                 # Build payload using final_title
                 mb = 0  # size not available in feed
-                raw = f"{final_title}|{url}|{mirror}|{mb}|{password}|".encode("utf-8")
+                raw = f"{final_title}|{url}|{mirror}|{mb}|{release_id}|".encode("utf-8")
                 payload = urlsafe_b64encode(raw).decode("utf-8")
                 link = f"{shared_state.values['internal_address']}/download/?payload={payload}"
 
-                # Append one release entry for this specific block
-                releases.append({
-                    "details": {
-                        "title": final_title,
-                        "hostname": hostname,
-                        "imdb_id": None,
-                        "link": link,
-                        "mirror": mirror,
-                        "size": mb * 1024 * 1024,
-                        "date": date_converted,
-                        "source": url
-                    },
-                    "type": "protected"
-                })
+                # Append only unique releases
+                if final_title not in [r["details"]["title"] for r in releases]:
+                    releases.append({
+                        "details": {
+                            "title": final_title,
+                            "hostname": hostname,
+                            "imdb_id": None,
+                            "link": link,
+                            "mirror": mirror,
+                            "size": mb * 1024 * 1024,
+                            "date": date_converted,
+                            "source": url
+                        },
+                        "type": "protected"
+                    })
 
         except Exception as e:
             info(f"{hostname}: error parsing feed item: {e}")
@@ -385,6 +382,8 @@ def _build_guess_block_from_tab(soup, tab):
                     resolution = "1080p"
                 elif 690 <= height_int < 800:
                     resolution = "720p"
+        else:
+            resolution = "1080p"  # Fallback if no resolution found
 
         fake_block.append(soup.new_string(f": {resolution}"))
 
@@ -413,11 +412,17 @@ def _build_guess_block_from_tab(soup, tab):
     return fake_block
 
 
+def extract_season(title: str) -> int | None:
+    match = re.search(r'(?i)(?:^|[^a-zA-Z0-9])S(\d{1,4})(?!\d)', title)
+    if match:
+        return int(match.group(1))
+    return None
+
+
 def al_search(shared_state, start_time, request_from, search_string,
               mirror=None, season=None, episode=None):
     releases = []
     host = shared_state.values["config"]("Hostnames").get(hostname)
-    password = host
 
     headers = {
         'User-Agent': shared_state.values["user_agent"],
@@ -446,8 +451,10 @@ def al_search(shared_state, start_time, request_from, search_string,
     if not sess:
         return releases
 
+    encoded_search_string = quote_plus(search_string)
+
     try:
-        url = f'https://{host}/search?q={search_string}&type=anime'
+        url = f'https://www.{host}/search?q={encoded_search_string}'
         r = sess.get(url, timeout=10, headers=headers)
         r.raise_for_status()
     except Exception as e:
@@ -455,9 +462,20 @@ def al_search(shared_state, start_time, request_from, search_string,
         invalidate_session(shared_state)
         return releases
 
-    if r.status_code == 302:
-        src = r.headers.get("Location")
-        results = [{"url": src}]
+    if r.history:
+        # If just one valid search result exists, AL skips the search result page
+        last_redirect = r.history[-1]
+        redirect_location = last_redirect.headers['Location']
+        absolute_redirect_url = urljoin(last_redirect.url, redirect_location)  # in case of relative URL
+        debug(f"{search_string} redirected to {absolute_redirect_url} instead of search results page")
+
+        try:
+            soup = BeautifulSoup(r.text, "html.parser")
+            page_title = soup.title.string
+        except:
+            page_title = ""
+
+        results = [{"url": absolute_redirect_url, "title": page_title}]
     else:
         soup = BeautifulSoup(r.text, 'html.parser')
         results = []
@@ -473,6 +491,13 @@ def al_search(shared_state, start_time, request_from, search_string,
             url = title_tag['href'].strip()
             name = title_tag.get_text(strip=True)
 
+            sanitized_search_string = shared_state.sanitize_string(search_string)
+            sanitized_title = shared_state.sanitize_string(name)
+            if not re.search(rf'\b{re.escape(sanitized_search_string)}\b', sanitized_title):
+                debug(f"Search string '{search_string}' does not match '{name}'")
+                continue
+            debug(f"Matched search string '{search_string}' with result '{name}'")
+
             type_label = None
             for lbl in body.select('div.label-group a[href]'):
                 href = lbl['href']
@@ -486,12 +511,12 @@ def al_search(shared_state, start_time, request_from, search_string,
             if not type_label or type_label != valid_type:
                 continue
 
-            results.append({"url": url, "name": name})
+            results.append({"url": url, "title": name})
 
     for result in results:
         try:
             url = result["url"]
-            title = result.get("name") or ""
+            title = result.get("title") or ""
 
             context = "recents_al"
             threshold = 60
@@ -514,8 +539,11 @@ def al_search(shared_state, start_time, request_from, search_string,
             content = BeautifulSoup(data_html, "html.parser")
 
             # Find each download‐table and process it
+            release_id = 0
             download_tabs = content.select("div[id^=download_]")
             for tab in download_tabs:
+                release_id += 1
+
                 # Attempt to get a release title from Release Notes
                 release_notes_td = None
                 for tr in tab.select("tr"):
@@ -533,14 +561,15 @@ def al_search(shared_state, start_time, request_from, search_string,
                 if release_notes_td:
                     raw_rn = release_notes_td.get_text(strip=True)
                     rn_with_dots = raw_rn.replace(" ", ".")
-                    # Validate: must contain at least one dot and one dash
                     if "." in rn_with_dots and "-" in rn_with_dots:
-                        final_title = sanitize_title(rn_with_dots)
+                        # Check if string ends with Group tag (word after dash) - this should prevent false positives
+                        if re.search(r"-[\s.]?\w+$", rn_with_dots):
+                            final_title = shared_state.sanitize_title(rn_with_dots)
 
                 # If no valid title from Release Notes, guess
                 if not final_title:
                     fake_block = _build_guess_block_from_tab(content, tab)
-                    final_title = guess_title(title, valid_type, fake_block)
+                    final_title = guess_title(shared_state, title, valid_type, fake_block)
 
                 # Parse date
                 date_td = tab.select_one("tr:has(th>i.fa-calendar-alt) td.modified")
@@ -569,8 +598,36 @@ def al_search(shared_state, start_time, request_from, search_string,
                         except Exception as e:
                             debug(f"Error extracting size for {title}: {e}")
 
+                if season:
+                    try:
+                        season_in_title = extract_season(final_title)
+                        if season_in_title and season_in_title != int(season):
+                            debug(f"Excluding {final_title} due to season mismatch: {season_in_title} != {season}")
+                            continue
+                    except Exception as e:
+                        debug(f"Error extracting season from title '{final_title}': {e}")
+
+                if episode:
+                    try:
+                        episodes_div = tab.find("div", class_="episodes")
+                        if episodes_div:
+                            episode_links = episodes_div.find_all("a", attrs={"data-loop": re.compile(r"^\d+$")})
+                            total_episodes = len(episode_links)
+                            if total_episodes > 0:
+                                if mb > 0:
+                                    mb = int(mb / total_episodes)
+
+                                episode = int(episode)
+                                if 1 <= episode <= total_episodes:
+                                    match = re.search(r'(S\d{2,4})', final_title)
+                                    if match:
+                                        season = match.group(1)
+                                        final_title = final_title.replace(season, f"{season}E{episode:02d}")
+                    except ValueError:
+                        pass
+
                 payload = urlsafe_b64encode(
-                    f"{final_title}|{url}|{mirror}|{mb}|{password}|{imdb_id or ''}"
+                    f"{final_title}|{url}|{mirror}|{mb}|{release_id}|{imdb_id or ''}"
                     .encode("utf-8")
                 ).decode("utf-8")
                 link = f"{shared_state.values['internal_address']}/download/?payload={payload}"

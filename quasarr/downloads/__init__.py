@@ -40,7 +40,11 @@ def download(shared_state, request_from, title, url, mirror, size_mb, password, 
     wd = shared_state.values["config"]("Hostnames").get("wd")
 
     if al and al.lower() in url.lower():
-        links = get_al_download_links(shared_state, url, mirror, title)
+        release_id = password
+        payload = get_al_download_links(shared_state, url, mirror, title, release_id)
+        links = payload.get("links", [])
+        title = payload.get("title", title)
+        password = payload.get("password", "")
         if links:
             info(f"Decrypted {len(links)} download links for {title}")
             send_discord_message(shared_state, title=title, case="unprotected", imdb_id=imdb_id)
@@ -51,7 +55,7 @@ def download(shared_state, request_from, title, url, mirror, size_mb, password, 
                 success = False
         else:
             fail(title, package_id, shared_state,
-                 reason=f'Offline / no links found for "{title}" on DT - "{url}"')
+                 reason=f'Offline / no links found for "{title}" on AL - "{url}"')
             success = False
 
     elif dd and dd.lower() in url.lower():
@@ -181,7 +185,8 @@ def download(shared_state, request_from, title, url, mirror, size_mb, password, 
 
     return {
         "success": success,
-        "package_id": package_id
+        "package_id": package_id,
+        "title": title
     }
 
 

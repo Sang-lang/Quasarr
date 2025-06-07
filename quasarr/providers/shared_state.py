@@ -428,6 +428,35 @@ def convert_to_mb(item):
     return int(size_mb)
 
 
+def sanitize_title(title: str) -> str:
+    # 1) Map German umlauts and ß
+    umlaut_map = {
+        "Ä": "Ae", "ä": "ae",
+        "Ö": "Oe", "ö": "oe",
+        "Ü": "Ue", "ü": "ue",
+        "ß": "ss"
+    }
+    for umlaut, replacement in umlaut_map.items():
+        title = title.replace(umlaut, replacement)
+
+    # 2) Force to ASCII (drops any remaining non-ASCII)
+    title = title.encode("ascii", errors="ignore").decode()
+
+    # 3) Replace slashes and spaces with dots
+    title = title.replace("/", "").replace(" ", ".")
+
+    # 4) Collapse runs of dots, strip leading/trailing dots,
+    #    and fix dot-hyphen-dot sequences
+    title = re.sub(r"\.{2,}", ".", title)  # multiple dots → one
+    title = title.strip(".")  # no leading/trailing dots
+    title = title.replace(".-.", "-")  # .-. → -
+
+    # 5) Finally, drop any chars except letters, digits, dots, hyphens, ampersands
+    title = re.sub(r"[^A-Za-z0-9\.\-\&]", "", title)
+
+    return title
+
+
 def sanitize_string(s):
     s = s.lower()
 
@@ -593,7 +622,7 @@ def get_recently_searched(shared_state, context, timeout_seconds):
     threshold = datetime.now() - timedelta(seconds=timeout_seconds)
     keys_to_remove = [key for key, value in recently_searched.items() if value["timestamp"] <= threshold]
     for key in keys_to_remove:
-        debug(f"Removing '/{key}' from recently searched memory ({context})...")
+        debug(f"Removing '{key}' from recently searched memory ({context})...")
         del recently_searched[key]
     return recently_searched
 

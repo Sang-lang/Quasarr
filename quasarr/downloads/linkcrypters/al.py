@@ -114,11 +114,18 @@ def decrypt_content(content_items: list[dict], mirror: str | None) -> list[str]:
 
     decrypted_links: list[str] = []
 
-    for idx, item in enumerate(filtered):
+    # If 'filtered' is a dictionary, iterate over its values; otherwise, assume it's a list.
+    items_to_process = filtered.values() if isinstance(filtered, dict) else filtered
+
+    for idx, item in enumerate(items_to_process):
+        if not isinstance(item, dict):
+            info(f"[Item {idx}] Invalid item format; expected dict, got {type(item).__name__}")
+            continue
+
         hoster_name = item.get("hoster", "<unknown>")
         cnl_info = item.get("cnl", {})
-        jnk = cnl_info.get("jk")
-        crypted = cnl_info.get("crypted")
+        jnk = cnl_info.get("jk", "")
+        crypted = cnl_info.get("crypted", "")
 
         if not jnk or not crypted:
             info(f"[Item {idx} | hoster={hoster_name}] Missing 'jk' or 'crypted' → skipping")
@@ -165,27 +172,27 @@ def solve_captcha(hostname, shared_state, fetch_via_flaresolverr, fetch_via_requ
     )
 
     try:
-        raw_ids = result["json"]
+        image_ids = result["json"]
     except ValueError:
         raise RuntimeError(f"Cannot decode captcha IDs: {result['text']}")
 
-    if not isinstance(raw_ids, list) or len(raw_ids) < 2:
+    if not isinstance(image_ids, list) or len(image_ids) < 2:
         raise RuntimeError("Unexpected captcha IDs format.")
 
     # Download each image
     images = []
-    for c in raw_ids:
-        img_url = f"{captcha_base}?cid=0&hash={c}"
+    for img_id in image_ids:
+        img_url = f"{captcha_base}?cid=0&hash={img_id}"
         r_img = fetch_via_requests_session(shared_state, method="GET", target_url=img_url, timeout=30)
         if r_img.status_code != 200:
-            raise RuntimeError(f"Failed to download captcha image {c} (HTTP {r_img.status_code})")
+            raise RuntimeError(f"Failed to download captcha image {img_id} (HTTP {r_img.status_code})")
         elif not r_img.content:
-            raise RuntimeError(f"Captcha image {c} is empty or invalid.")
-        images.append((c, r_img.content))
+            raise RuntimeError(f"Captcha image {img_id} is empty or invalid.")
+        images.append((img_id, r_img.content))
 
-    # Calculate differences using PIL
-    pil_images = []
-    for cid, raw_bytes in images:
+    # Convert to internal representation
+    image_objects = []
+    for image_id, raw_bytes in images:
         img = Image.open(BytesIO(raw_bytes))
 
         # if it’s a palette (P) image with an indexed transparency, go through RGBA
@@ -201,20 +208,20 @@ def solve_captcha(hostname, shared_state, fetch_via_flaresolverr, fetch_via_requ
             # for all other modes, just convert to plain RGB
             img = img.convert("RGB")
 
-        pil_images.append((cid, img))
+        image_objects.append((image_id, img))
 
-    diffs_pil = []
-    for idx_i, (cid_i, img_i) in enumerate(pil_images):
-        tot = 0.0
-        for idx_j, (cid_j, img_j) in enumerate(pil_images):
+    images_pixel_differences = []
+    for idx_i, (img_id_i, img_i) in enumerate(image_objects):
+        total_difference = 0.0
+        for idx_j, (img_id_j, img_j) in enumerate(image_objects):
             if idx_i == idx_j:
-                continue
-            tot += calculate_pixel_based_difference(img_i, img_j)
-        diffs_pil.append((cid_i, tot))
+                continue  # skip self-comparison
+            total_difference += calculate_pixel_based_difference(img_i, img_j)
+        images_pixel_differences.append((img_id_i, total_difference))
 
-    identified_captcha_image, cum_pct_pil = max(diffs_pil, key=lambda x: x[1])
-    different_pixels_percentage = int(cum_pct_pil / len(images)) if images else int(cum_pct_pil)
-    info(f'CAPTCHA image "{identified_captcha_image}.png" - difference to others: {different_pixels_percentage}%')
+    identified_captcha_image, cumulated_percentage = max(images_pixel_differences, key=lambda x: x[1])
+    different_pixels_percentage = int(cumulated_percentage / len(images)) if images else int(cumulated_percentage)
+    info(f'CAPTCHA image "{identified_captcha_image}" - difference to others: {different_pixels_percentage}%')
 
     result = fetch_via_flaresolverr(
         shared_state,

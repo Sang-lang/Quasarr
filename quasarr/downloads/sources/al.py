@@ -271,89 +271,81 @@ def fetch_via_requests_session(shared_state, method: str, target_url: str, post_
     return resp
 
 
-def find_download_info(html: str, target_group: str):
-    """
-    Parse the given HTML and return a tuple (download_id, total_episodes)
-    for the pane whose Release Group == target_group.
-    - download_id is the integer N from id="download_N"
-    - total_episodes is the count of <a> tags in that pane with a numeric data-loop
-
-    If no matching release group is found, returns (None, 0).
-    """
-    soup = BeautifulSoup(html, "html.parser")
-
-    download_panes = soup.find_all("div", class_="tab-pane", id=re.compile(r"^download_(\d+)$"))
-
-    for pane in download_panes:
-        pane_id = pane.get("id", "")
-        match = re.match(r"download_(\d+)", pane_id)
-        if not match:
-            continue
-        download_id = int(match.group(1))
-
-        release_tr = None
-        for tr in pane.find_all("tr"):
-            th = tr.find("th")
-            th_text = th.get_text(strip=True)
-            if re.search(r"Release\s+(Group|Gruppe)", th_text):
-                release_tr = tr
+def get_release_title_by_id(shared_state, details_html, release_id, title):
+    soup = BeautifulSoup(details_html, "html.parser")
+    tab = soup.find("div", class_="tab-pane", id=f"download_{release_id}")
+    if tab:
+        # Attempt to get a release title from Release Notes
+        release_notes_td = None
+        for tr in tab.select("tr"):
+            th = tr.select_one("th")
+            if not th:
+                continue
+            icon = th.find("i", class_="fa-info")
+            if icon:
+                td = tr.select_one("td")
+                if td and td.get_text(strip=True):
+                    release_notes_td = td
                 break
 
-        if not release_tr:
-            continue
-
-        td = release_tr.find("td")
-        if not td:
-            continue
-        group_name = td.get_text(strip=True)
-        if target_group not in group_name:
-            continue
-
-        episodes_div = pane.find("div", class_="episodes")
-        if not episodes_div:
-            return download_id, 0
-
-        episode_links = episodes_div.find_all("a", attrs={"data-loop": re.compile(r"^\d+$")})
-        total_episodes = len(episode_links)
-
-        return download_id, total_episodes
-
-    # No matching Release Group found
-    return None, 0
+        final_title = None
+        if release_notes_td:
+            raw_rn = release_notes_td.get_text(strip=True)
+            rn_with_dots = raw_rn.replace(" ", ".")
+            if "." in rn_with_dots and "-" in rn_with_dots:
+                # Check if string ends with Group tag (word after dash) - this should prevent false positives
+                if re.search(r"-[\s.]?\w+$", rn_with_dots):
+                    final_title = shared_state.sanitize_title(rn_with_dots)
+                    if final_title and final_title.lower() != title.lower():
+                        info(f'Identified true release title "{final_title}" on details page')
+                        return final_title
+    return title
 
 
-def get_al_download_links(shared_state, url, mirror, title):
+def extract_episode(title: str) -> int | None:
+    match = re.search(r'\bS\d{2,4}E(\d+)\b(?![\-E\d])', title)
+    if match:
+        return int(match.group(1))
+
+    if not re.search(r'\bS\d{2,4}\b', title):
+        match = re.search(r'\.E(\d+)\b(?![\-E\d])', title)
+        if match:
+            return int(match.group(1))
+
+    return None
+
+
+def get_al_download_links(shared_state, url, mirror, title, release_id):
     al = shared_state.values["config"]("Hostnames").get(hostname)
 
     sess = retrieve_and_validate_session(shared_state)
     if not sess:
         info(f"Could not retrieve valid session for {al}")
-        return []
-
-    links = []
+        return {}
 
     details_page = fetch_via_flaresolverr(shared_state, "GET", url, timeout=30)
     details_html = details_page.get("text", "")
     if not details_html:
         info(f"Failed to load details page for {title} at {url}")
-        return []
+        return {}
 
-    release_id, total_eps = find_download_info(details_html, "sama")  # todo title search instead of hardcoded group
-    info(f"Selected release {release_id} with {total_eps} episodes for download")
+    title = get_release_title_by_id(shared_state, details_html, release_id, title)
 
-    episode = None  # todo grab from title later / function param
-
-    if episode is not None and str(episode).strip().isdigit():
-        selection = int(episode)
+    episode_in_title = extract_episode(title)
+    if episode_in_title:
+        selection = episode_in_title - 1  # Convert to zero-based index
     else:
         selection = "cnl"
 
     anime_identifier = url.rstrip("/").split("/")[-1]
 
-    if not release_id:
-        info(f"No valid release ID found for {title} at {url}")
-        return []
+    if int(release_id) < 1:
+        release_id = 1
+        info(f"No valid release ID found for {title} at {url}, falling back to {release_id}")
 
+    info(f'Selected "Release {release_id}" from {url}')
+
+    links = []
     try:
         raw_request = json.dumps(
             ["media", anime_identifier, "downloads", release_id, selection]
@@ -374,14 +366,14 @@ def get_al_download_links(shared_state, url, mirror, title):
         status = result.get("status_code")
         if not status == 200:
             info(f"FlareSolverr returned HTTP {status} for captcha request")
-            return []
+            return {}
         else:
             text = result.get("text", "")
             try:
                 response_json = result["json"]
             except ValueError:
                 info(f"Unexpected response when initiating captcha: {text}")
-                return []
+                return {}
 
             code = response_json.get("code", "")
             message = response_json.get("message", "")
@@ -395,8 +387,11 @@ def get_al_download_links(shared_state, url, mirror, title):
                 while tries < 3:
                     try:
                         info(
-                            f"Starting CAPTCHA solving for episode {selection} of {title} at {url} (attempt {tries + 1})")
-                        attempt = solve_captcha(hostname, url, sess, shared_state, fetch_via_flaresolverr)
+                            f"Starting attempt {tries + 1} to solve CAPTCHA for "
+                            f"{f'episode {episode_in_title}' if selection and selection != 'cnl' else 'all links'}"
+                        )
+                        attempt = solve_captcha(hostname, shared_state, fetch_via_flaresolverr,
+                                                fetch_via_requests_session)
 
                         solved = (unwrap_flaresolverr_body(attempt.get("response")) == "1")
                         captcha_id = attempt.get("captcha_id", None)
@@ -455,10 +450,10 @@ def get_al_download_links(shared_state, url, mirror, title):
                     f"Code: {code}, Message: {message}"
                 )
                 invalidate_session(shared_state)
-                return []
+                return {}
 
             try:
-                links.extend(decrypt_content(content_items, mirror))
+                links = decrypt_content(content_items, mirror)
                 debug(f"Decrypted URLs: {links}")
             except Exception as e:
                 info(f"Error during decryption: {e}")
@@ -466,4 +461,8 @@ def get_al_download_links(shared_state, url, mirror, title):
         info(f"Error loading AL download: {e}")
         invalidate_session(shared_state)
 
-    return links
+    return {
+        "links": links,
+        "password": f"www.{al}",
+        "title": title
+    }

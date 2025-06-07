@@ -15,18 +15,6 @@ hostname = "fx"
 supported_mirrors = ["rapidgator"]
 
 
-def sanitize_title(title):
-    umlaut_map = {
-        "Ä": "Ae", "ä": "ae",
-        "Ö": "Oe", "ö": "oe",
-        "Ü": "Ue", "ü": "ue",
-        "ß": "ss"
-    }
-    for umlaut, replacement in umlaut_map.items():
-        title = title.replace(umlaut, replacement)
-    return title.encode("ascii", errors="ignore").decode().replace("/", "").replace(" ", ".").strip()
-
-
 def extract_size(text):
     match = re.match(r"(\d+)\s*([A-Za-z]+)", text)
     if match:
@@ -37,7 +25,7 @@ def extract_size(text):
         raise ValueError(f"Invalid size format: {text}")
 
 
-def fx_feed(shared_state, start_time, request_from, mirror=None):
+def fx_feed(shared_state, start_time, mirror=None):
     releases = []
 
     fx = shared_state.values["config"]("Hostnames").get(hostname.lower())
@@ -73,7 +61,7 @@ def fx_feed(shared_state, start_time, request_from, mirror=None):
                 i = 0
                 for title in titles:
                     link = title["href"]
-                    title = sanitize_title(title.text)
+                    title = shared_state.sanitize_title(title.text)
 
                     try:
                         imdb_link = article.find("a", href=re.compile(r"imdb\.com"))
@@ -168,7 +156,7 @@ def fx_search(shared_state, start_time, request_from, search_string, mirror=None
                     i = 0
                     for title in titles:
                         link = title["href"]
-                        title = sanitize_title(title.text)
+                        title = shared_state.sanitize_title(title.text)
 
                         if not shared_state.is_valid_release(title,
                                                              request_from,

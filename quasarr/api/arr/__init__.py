@@ -69,6 +69,7 @@ def setup_arr_routes(app):
             try:
                 success = downloaded["success"]
                 package_id = downloaded["package_id"]
+                title = downloaded["title"]
 
                 if success:
                     info(f'"{title}" added successfully!')

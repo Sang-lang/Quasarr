@@ -187,6 +187,8 @@ def flaresolverr_config(shared_state):
     @app.get('/')
     def url_form():
         form_content = '''
+        <span><a href="https://github.com/FlareSolverr/FlareSolverr?tab=readme-ov-file#installation">A local instance</a>
+        must be running and reachable to Quasarr!</span><br><br>
         <label for="url">FlareSolverr URL</label>
         <input type="text" id="url" name="url" placeholder="http://192.168.0.1:8191/v1"><br>
         '''
