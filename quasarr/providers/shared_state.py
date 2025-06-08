@@ -460,6 +460,8 @@ def sanitize_title(title: str) -> str:
 def sanitize_string(s):
     s = s.lower()
 
+    # Remove broken html entity
+    s = s.replace('& x27 ', "'")
     # Remove dots / pluses
     s = s.replace('.', ' ')
     s = s.replace('+', ' ')
