@@ -11,7 +11,7 @@ from urllib.parse import urljoin, quote_plus
 
 from bs4 import BeautifulSoup
 
-from quasarr.downloads.sources.al import retrieve_and_validate_session, invalidate_session
+from quasarr.downloads.sources.al import invalidate_session, fetch_via_requests_session
 from quasarr.providers.imdb_metadata import get_localized_title
 from quasarr.providers.log import info, debug
 
@@ -234,10 +234,6 @@ def al_feed(shared_state, start_time, request_from, mirror=None):
     releases = []
     host = shared_state.values["config"]("Hostnames").get(hostname)
 
-    headers = {
-        'User-Agent': shared_state.values["user_agent"],
-    }
-
     if "Radarr" in request_from:
         wanted_type = "movie"
     else:
@@ -247,12 +243,8 @@ def al_feed(shared_state, start_time, request_from, mirror=None):
         debug(f'Mirror "{mirror}" not supported by {hostname}.')
         return releases
 
-    sess = retrieve_and_validate_session(shared_state)
-    if not sess:
-        return releases
-
     try:
-        r = sess.get(f'https://www.{host}/', timeout=10, headers=headers)
+        r = fetch_via_requests_session(shared_state, method="GET", target_url=f'https://www.{host}/', timeout=10)
         r.raise_for_status()
     except Exception as e:
         info(f"{hostname}: could not fetch feed: {e}")
@@ -368,7 +360,7 @@ def _build_guess_block_from_tab(soup, tab):
     res_td = tab.select_one("tr:has(th>i.fa-desktop) td")
     if res_td:
         res_val = res_td.get_text(strip=True)
-        resolution = "480p"  # Default fallback
+        resolution = "1080p"  # Default fallback
 
         match = re.search(r'(\d+)\s*x\s*(\d+)', res_val)
         if match:
@@ -382,8 +374,6 @@ def _build_guess_block_from_tab(soup, tab):
                     resolution = "1080p"
                 elif 690 <= height_int < 800:
                     resolution = "720p"
-        else:
-            resolution = "1080p"  # Fallback if no resolution found
 
         fake_block.append(soup.new_string(f": {resolution}"))
 
@@ -424,10 +414,6 @@ def al_search(shared_state, start_time, request_from, search_string,
     releases = []
     host = shared_state.values["config"]("Hostnames").get(hostname)
 
-    headers = {
-        'User-Agent': shared_state.values["user_agent"],
-    }
-
     if "Radarr" in request_from:
         valid_type = "movie"
     else:
@@ -447,15 +433,11 @@ def al_search(shared_state, start_time, request_from, search_string,
 
     search_string = unescape(search_string)
 
-    sess = retrieve_and_validate_session(shared_state)
-    if not sess:
-        return releases
-
     encoded_search_string = quote_plus(search_string)
 
     try:
         url = f'https://www.{host}/search?q={encoded_search_string}'
-        r = sess.get(url, timeout=10, headers=headers)
+        r = fetch_via_requests_session(shared_state, method="GET", target_url=url, timeout=10)
         r.raise_for_status()
     except Exception as e:
         info(f"{hostname}: search load error: {e}")
@@ -530,7 +512,7 @@ def al_search(shared_state, start_time, request_from, search_string,
                 data_html = entry["html"]
             else:
                 entry = {"timestamp": datetime.now()}
-                data_html = sess.get(url, headers=headers, timeout=10).text
+                data_html = fetch_via_requests_session(shared_state, method="GET", target_url=url, timeout=10).text
 
             entry["html"] = data_html
             recently_searched[url] = entry

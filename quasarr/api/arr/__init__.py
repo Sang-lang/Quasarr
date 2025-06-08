@@ -4,6 +4,7 @@
 
 import traceback
 import xml.sax.saxutils as sax_utils
+from datetime import datetime
 from base64 import urlsafe_b64decode
 from functools import wraps
 from xml.etree import ElementTree
@@ -180,11 +181,10 @@ def setup_arr_routes(app):
                                     url="https://quasarr.indexer/" 
                                     email="support@quasarr.indexer" 
                                   />
-                                  <limits max="999" default="999" />
+                                  <limits max="9999" default="9999" />
                                   <registration available="no" open="no" />
                                   <searching>
-                                    <search available="yes" supportedParams="q" />
-                                    <tv-search available="yes" supportedParams="q,imdbid,season,ep" />
+                                    <tv-search available="yes" supportedParams="imdbid,season,ep" />
                                     <movie-search available="yes" supportedParams="imdbid" />
                                   </searching>
                                   <categories>
@@ -192,66 +192,43 @@ def setup_arr_routes(app):
                                     <category id="2000" name="Movies" />
                                   </categories>
                                 </caps>'''
-                elif mode in ['movie', 'tvsearch', 'search']:
+                elif mode in ['movie', 'tvsearch']:
                     releases = []
 
                     if mode == 'movie':
                         # supported params: imdbid
-                        search_param = f"tt{getattr(request.query, 'imdbid', '')}" \
-                            if getattr(request.query, 'imdbid', '') else ""
-
+                        imdb_id = getattr(request.query, 'imdbid', '')
                         releases = get_search_results(shared_state, request_from,
-                                                      search_string=search_param,
+                                                      imdb_id=imdb_id,
                                                       mirror=mirror
                                                       )
 
-                    elif mode == 'search':
-                        # supported params: q
-                        search_param = getattr(request.query, 'q', '')
-                        if search_param:
-                            releases = get_search_results(shared_state, request_from,
-                                                          search_string=search_param,
-                                                          mirror=mirror
-                                                          )
-                        else:
-                            debug(f'No search parameter provided. Ignoring request: {dict(request.query)}')
-
                     elif mode == 'tvsearch':
-                        # supported params: q, imdbid, season and ep
-                        if getattr(request.query, 'imdbid', ''):
-                            search_param = getattr(request.query, 'imdbid', '')
-                            if not search_param.startswith("tt"):
-                                search_param = f"tt{search_param}"
-                        else:
-                            search_param = getattr(request.query, 'q', "")
+                        # supported params: imdbid, season, ep
+                        imdb_id = getattr(request.query, 'imdbid', '')
                         season = getattr(request.query, 'season', None)
                         episode = getattr(request.query, 'ep', None)
-
-                        offset = getattr(request.query, 'offset', "")  # ignoring offset higher than 0 on purpose
-                        if int(offset) == 0:
-                            releases = get_search_results(shared_state, request_from,
-                                                          search_string=search_param,
-                                                          mirror=mirror,
-                                                          season=season,
-                                                          episode=episode
-                                                          )
-                        else:
-                            debug(f'Offset higher than 0 is not supported. Ignoring request: {dict(request.query)}')
+                        releases = get_search_results(shared_state, request_from,
+                                                      imdb_id=imdb_id,
+                                                      mirror=mirror,
+                                                      season=season,
+                                                      episode=episode
+                                                      )
 
                     items = ""
                     for release in releases:
-                        release = release["details"]
+                        release = release.get("details", {})
 
-                        prefix = f'[{release["hostname"].upper()}]'
+                        prefix = f'[{release.get("hostname", "").upper()}]'
 
                         items += f'''
                         <item>
-                            <title>{prefix} {sax_utils.escape(release["title"])}</title>
-                            <guid isPermaLink="True">{release["link"]}</guid>
-                            <link>{release["link"]}</link>
-                            <comments>{release["source"]}</comments>
-                            <pubDate>{release["date"]}</pubDate>
-                            <enclosure url="{release["link"]}" length="{release["size"]}" type="application/x-nzb" />
+                            <title>{prefix} {sax_utils.escape(release.get("title", ""))}</title>
+                            <guid isPermaLink="True">{release.get("link", "")}</guid>
+                            <link>{release.get("link", "")}</link>
+                            <comments>{release.get("source", "")}</comments>
+                            <pubDate>{release.get("date", datetime.now().strftime("%a, %d %b %Y %H:%M:%S +0000"))}</pubDate>
+                            <enclosure url="{release.get("link", "")}" length="{release.get("size", 0)}" type="application/x-nzb" />
                         </item>'''
 
                     return f'''<?xml version="1.0" encoding="UTF-8"?>

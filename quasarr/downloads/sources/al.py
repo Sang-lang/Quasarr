@@ -253,7 +253,6 @@ def fetch_via_flaresolverr(shared_state,
 def fetch_via_requests_session(shared_state, method: str, target_url: str, post_data: dict = None, timeout: int = 30):
     """
     – method: "GET" or "POST"
-    – params: for GET only
     – post_data: for POST only (will be sent as form-data unless you explicitly JSON-encode)
     – timeout: seconds
     """
