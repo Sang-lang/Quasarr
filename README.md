@@ -1,4 +1,4 @@
-#  
+#   
 
 <img src="https://raw.githubusercontent.com/rix1337/Quasarr/main/Quasarr.png" data-canonical-src="https://raw.githubusercontent.com/rix1337/Quasarr/main/Quasarr.png" width="64" height="64" />
 
@@ -29,17 +29,21 @@ Quasarr will confidently handle the rest.
     * Consider setting up a fresh JDownloader before you begin.
     * JDownloader must be running and available to Quasarr.
     * Quasarr will modify the settings of JDownloader so downloads can be properly handled by Radarr/Sonarr.
-    * If using docker, make extra sure that JDownloader's download path is available to Radarr/Sonarr with the exact same
+    * If using docker, make extra sure that JDownloader's download path is available to Radarr/Sonarr with the exact
+      same
       internal and external path mapping. Just matching the external path is not enough.
 * Set up Quasarr as `Newznab Indexer` and `SABnzbd Download Client` in Radarr/Sonarr
     * Use the `URL` from the `API Information` section of the console output (or copy it from the Quasarr web UI)
     * Use the `API Key` from the `API Information` section of the console output (or copy it from the Quasarr web UI)
     * Leave all other settings by default.
+    * Important notice for **Sonarr**:
+        * Ensure all shows, including anime are set to the `Standard` series type.
+        * Quasarr will never find releases for shows set to type `Anime / Absolute`
     * If you prefer to only get releases for a specific mirror, add the mirror name to the
       API path in the advanced indexer settings.
-      * Example: `/api/dropbox/` results will only return releases where `dropbox` is explicitly mentioned in a link.
-      * This means that if a mirror is not available at a hostname, the release is ignored or the download will fail.
-        So use this option with caution.
+        * Example: `/api/dropbox/` results will only return releases where `dropbox` is explicitly mentioned in a link.
+        * This means that if a mirror is not available at a hostname, the release is ignored or the download will fail.
+          So use this option with caution.
 * To see download status information
     * Open `Activity` → `Queue` → `Options` in Radarr/Sonarr
     * Enable `Release Title`
@@ -99,6 +103,7 @@ We will not waste precious time on features that will slow future development cy
 It is by choice, that you will not find settings or filtering options in Quasarr.
 
 Most feature requests can be satisfied by:
+
 - Existing settings in Radarr/Sonarr
 - Existing settings in JDownloader
 - Existing tools from the *arr ecosystem that integrate directly with Radarr/Sonarr
@@ -110,7 +115,7 @@ If you want to edit the hostname selection after the initial setup, you can do s
 - Assume there are zero known
   issues [unless you find one or more open issues in this repository](https://github.com/rix1337/Quasarr/issues).
 - Still having an issue? Provide a detailed report [here](https://github.com/rix1337/Quasarr/issues/new/choose)!
-- There are no hostname integrations in active development unless you see an open pull request 
+- There are no hostname integrations in active development unless you see an open pull request
   [here](https://github.com/rix1337/Quasarr/pulls).
 - Pull requests are welcome. Especially for popular hostnames.
     - Always reach out on Discord before starting work on a new feature to prevent waste of time.
@@ -118,7 +123,6 @@ If you want to edit the hostname selection after the initial setup, you can do s
     - Anti-bot measures must be circumvented fully by Quasarr. Thus you will need to provide a working solution for new
       CAPTCHA types by integrating it in the Quasarr Web UI.
     - Please provide proof of functionality (screenshots/examples) when submitting your pull request.
-
 
 # SponsorsHelper
 
@@ -130,7 +134,7 @@ The SponsorsHelper is a Docker image that automatically solves CAPTCHAs and decr
 
 The image is only available to active [sponsors](https://github.com/users/rix1337/sponsorship) (hence the name).
 
-Access is automatically granted via GitHub: 
+Access is automatically granted via GitHub:
 
 [![Github Sponsorship](https://img.shields.io/badge/support-me-red.svg)](https://github.com/users/rix1337/sponsorship)
 
@@ -167,7 +171,8 @@ docker run -d \
 
 - `-e 'QUASARR_URL'` The local URL of Quasarr - e.g., `http://192.168.0.1:8080`
   (should match the `INTERNAL_ADDRESS` parameter from above)
-- `-e 'DEATHBYCAPTCHA_TOKEN'` The account token from [DeathByCaptcha](https://deathbycaptcha.com/register?refid=6184288242b) - e.g.,
+- `-e 'DEATHBYCAPTCHA_TOKEN'` The account token
+  from [DeathByCaptcha](https://deathbycaptcha.com/register?refid=6184288242b) - e.g.,
   `2FMum5zuDBxMmbXDIsADnllEFl73bomydIpzo7...aBc`
 
 # Development Setup for Pull Requests

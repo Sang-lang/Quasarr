@@ -11,7 +11,7 @@ from urllib.parse import urljoin, quote_plus
 
 from bs4 import BeautifulSoup
 
-from quasarr.downloads.sources.al import retrieve_and_validate_session, invalidate_session
+from quasarr.downloads.sources.al import invalidate_session, fetch_via_requests_session
 from quasarr.providers.imdb_metadata import get_localized_title
 from quasarr.providers.log import info, debug
 
@@ -190,8 +190,8 @@ def guess_title(shared_state, raw_base_title, release_type, block):
         lang_prefix = "German.ML"
     elif "German" in audio_langs and "Japanese" in audio_langs:
         lang_prefix = "German.DL"
-    elif "German" in subtitle_langs:
-        lang_prefix = "German.Subbed"
+    elif audio_langs and "German" in subtitle_langs:
+        lang_prefix = f"{audio_langs[0]}.Subbed"
 
     # Assemble final title parts:
     # If both season_str and ep_text exist, merge into "SXXEYY"
@@ -209,7 +209,45 @@ def guess_title(shared_state, raw_base_title, release_type, block):
     if res_text:
         parts.append(res_text)
 
-    parts.append("WEB-DL.x264")  # default to most common source
+    # Check notes for hints of video source
+    notes = block.find("b")
+    if notes:
+        notes_text = notes.get_text(strip=True).lower()
+    else:
+        notes_text = ""
+
+    source = "WEB-DL"
+    if "blu-ray" in notes_text or "bd" in notes_text or "bluray" in notes_text:
+        source = "BluRay"
+    elif "hdtv" in notes_text or "tvrip" in notes_text:
+        source = "HDTV"
+    parts.append(source)
+
+    audio = "AC3"
+    if "flac" in notes_text:
+        audio = "FLAC"
+    elif "aac" in notes_text:
+        audio = "AAC"
+    elif "opus" in notes_text:
+        audio = "Opus"
+    elif "mp3" in notes_text:
+        audio = "MP3"
+    elif "pcm" in notes_text:
+        audio = "PCM"
+    elif "dts" in notes_text:
+        audio = "DTS"
+    parts.append(audio)
+
+    video = "x264"
+    if "265" in notes_text or "hevc" in notes_text:
+        video = "x265"
+    elif "av1" in notes_text:
+        video = "AV1"
+    elif "avc" in notes_text:
+        video = "AVC"
+    elif "xvid" in notes_text:
+        video = "Xvid"
+    parts.append(video)
 
     # Join with dots
     candidate = ".".join(parts)
@@ -234,10 +272,6 @@ def al_feed(shared_state, start_time, request_from, mirror=None):
     releases = []
     host = shared_state.values["config"]("Hostnames").get(hostname)
 
-    headers = {
-        'User-Agent': shared_state.values["user_agent"],
-    }
-
     if "Radarr" in request_from:
         wanted_type = "movie"
     else:
@@ -247,12 +281,8 @@ def al_feed(shared_state, start_time, request_from, mirror=None):
         debug(f'Mirror "{mirror}" not supported by {hostname}.')
         return releases
 
-    sess = retrieve_and_validate_session(shared_state)
-    if not sess:
-        return releases
-
     try:
-        r = sess.get(f'https://www.{host}/', timeout=10, headers=headers)
+        r = fetch_via_requests_session(shared_state, method="GET", target_url=f'https://www.{host}/', timeout=10)
         r.raise_for_status()
     except Exception as e:
         info(f"{hostname}: could not fetch feed: {e}")
@@ -368,7 +398,7 @@ def _build_guess_block_from_tab(soup, tab):
     res_td = tab.select_one("tr:has(th>i.fa-desktop) td")
     if res_td:
         res_val = res_td.get_text(strip=True)
-        resolution = "480p"  # Default fallback
+        resolution = "1080p"  # Default fallback
 
         match = re.search(r'(\d+)\s*x\s*(\d+)', res_val)
         if match:
@@ -382,8 +412,6 @@ def _build_guess_block_from_tab(soup, tab):
                     resolution = "1080p"
                 elif 690 <= height_int < 800:
                     resolution = "720p"
-        else:
-            resolution = "1080p"  # Fallback if no resolution found
 
         fake_block.append(soup.new_string(f": {resolution}"))
 
@@ -409,6 +437,14 @@ def _build_guess_block_from_tab(soup, tab):
         span.string = f"Release Group: {grp_name}"
         fake_block.append(span)
 
+    notes_td = tab.select_one("tr:has(th>i.fa-info) td")
+    if notes_td:
+        notes_text = notes_td.get_text(strip=True)
+        bold = soup.new_tag("b")
+        if notes_text:
+            bold.string = notes_text
+            fake_block.append(bold)
+
     return fake_block
 
 
@@ -423,10 +459,6 @@ def al_search(shared_state, start_time, request_from, search_string,
               mirror=None, season=None, episode=None):
     releases = []
     host = shared_state.values["config"]("Hostnames").get(hostname)
-
-    headers = {
-        'User-Agent': shared_state.values["user_agent"],
-    }
 
     if "Radarr" in request_from:
         valid_type = "movie"
@@ -447,15 +479,11 @@ def al_search(shared_state, start_time, request_from, search_string,
 
     search_string = unescape(search_string)
 
-    sess = retrieve_and_validate_session(shared_state)
-    if not sess:
-        return releases
-
     encoded_search_string = quote_plus(search_string)
 
     try:
         url = f'https://www.{host}/search?q={encoded_search_string}'
-        r = sess.get(url, timeout=10, headers=headers)
+        r = fetch_via_requests_session(shared_state, method="GET", target_url=url, timeout=10)
         r.raise_for_status()
     except Exception as e:
         info(f"{hostname}: search load error: {e}")
@@ -530,7 +558,7 @@ def al_search(shared_state, start_time, request_from, search_string,
                 data_html = entry["html"]
             else:
                 entry = {"timestamp": datetime.now()}
-                data_html = sess.get(url, headers=headers, timeout=10).text
+                data_html = fetch_via_requests_session(shared_state, method="GET", target_url=url, timeout=10).text
 
             entry["html"] = data_html
             recently_searched[url] = entry
