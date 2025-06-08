@@ -190,8 +190,8 @@ def guess_title(shared_state, raw_base_title, release_type, block):
         lang_prefix = "German.ML"
     elif "German" in audio_langs and "Japanese" in audio_langs:
         lang_prefix = "German.DL"
-    elif "German" in subtitle_langs:
-        lang_prefix = "German.Subbed"
+    elif audio_langs and "German" in subtitle_langs:
+        lang_prefix = f"{audio_langs[0]}.Subbed"
 
     # Assemble final title parts:
     # If both season_str and ep_text exist, merge into "SXXEYY"
