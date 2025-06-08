@@ -4,8 +4,8 @@
 
 import traceback
 import xml.sax.saxutils as sax_utils
-from datetime import datetime
 from base64 import urlsafe_b64decode
+from datetime import datetime
 from functools import wraps
 from xml.etree import ElementTree
 
@@ -184,6 +184,7 @@ def setup_arr_routes(app):
                                   <limits max="9999" default="9999" />
                                   <registration available="no" open="no" />
                                   <searching>
+                                    <search available="yes" supportedParams="q" />
                                     <tv-search available="yes" supportedParams="imdbid,season,ep" />
                                     <movie-search available="yes" supportedParams="imdbid" />
                                   </searching>
@@ -202,6 +203,10 @@ def setup_arr_routes(app):
                                                       imdb_id=imdb_id,
                                                       mirror=mirror
                                                       )
+
+                    elif mode == 'search':
+                        info(f'Ignoring search request from {request_from} - only imdbid searches are supported')
+                        releases = [{}]  # sonarr expects this but we will not support non-imdbid searches
 
                     elif mode == 'tvsearch':
                         # supported params: imdbid, season, ep
