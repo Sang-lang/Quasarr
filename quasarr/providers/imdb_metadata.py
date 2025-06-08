@@ -61,6 +61,8 @@ def get_localized_title(shared_state, imdb_id, language='de'):
     if not localized_title:
         debug(f"Could not get localized title for {imdb_id} in {language} from IMDb")
 
+    localized_title = re.sub(r'[^a-zA-Z0-9äöüÄÖÜß&]', ' ', localized_title).strip()
+
     return localized_title
 
 
