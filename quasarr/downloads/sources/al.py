@@ -558,33 +558,55 @@ def build_guess_block_from_tab(tab, episode=None):
     return fake_block
 
 
-def ensure_correct_release_title(shared_state, details_html, release_id, title, episode_in_title):
+def check_release(shared_state, details_html, release_id, title, episode_in_title):
     soup = BeautifulSoup(details_html, "html.parser")
+
+    if int(release_id) == 0:
+        info("Feed download detected, hard-coding release_id to 1 to achieve successful download")
+        release_id = 1
+        # The following logic works, but the highest release ID sometimes does not have the desired episode
+        #
+        # If download was started from the feed, the highest download id is typically the best option
+        # panes = soup.find_all("div", class_="tab-pane")
+        # max_id = None
+        # for pane in panes:
+        #     pane_id = pane.get("id", "")
+        #     match = re.match(r"download_(\d+)$", pane_id)
+        #     if match:
+        #         num = int(match.group(1))
+        #         if max_id is None or num > max_id:
+        #             max_id = num
+        # if max_id:
+        #     release_id = max_id
+
     tab = soup.find("div", class_="tab-pane", id=f"download_{release_id}")
     if tab:
-        # Attempt to get a release title from Release Notes
-        release_notes_td = None
-        for tr in tab.select("tr"):
-            th = tr.select_one("th")
-            if not th:
-                continue
-            icon = th.find("i", class_="fa-info")
-            if icon:
-                td = tr.select_one("td")
-                if td and td.get_text(strip=True):
-                    release_notes_td = td
-                break
+        try:
+            # Attempt to get real release title from Release Notes (if it exists)
+            release_notes_td = None
+            for tr in tab.select("tr"):
+                th = tr.select_one("th")
+                if not th:
+                    continue
+                icon = th.find("i", class_="fa-info")
+                if icon:
+                    td = tr.select_one("td")
+                    if td and td.get_text(strip=True):
+                        release_notes_td = td
+                    break
 
-        if release_notes_td:
-            raw_rn = release_notes_td.get_text(strip=True)
-            rn_with_dots = raw_rn.replace(" ", ".")
-            if "." in rn_with_dots and "-" in rn_with_dots:
-                # Check if string ends with Group tag (word after dash) - this should prevent false positives
-                if re.search(r"-[\s.]?\w+$", rn_with_dots):
-                    final_title = shared_state.sanitize_title(rn_with_dots)
-                    if final_title and final_title.lower() != title.lower():
-                        info(f'Identified true release title "{final_title}" on details page')
-                        return final_title
+            if release_notes_td:
+                raw_rn = release_notes_td.get_text(strip=True)
+                rn_with_dots = raw_rn.replace(" ", ".")
+                if "." in rn_with_dots and "-" in rn_with_dots:
+                    # Check if string ends with Group tag (word after dash) - this should prevent false positives
+                    if re.search(r"-[\s.]?\w+$", rn_with_dots):
+                        real_title = shared_state.sanitize_title(rn_with_dots)
+                        if real_title and real_title.lower() != title.lower():
+                            info(f'Identified true release title "{real_title}" on details page')
+                            return real_title, release_id
+        except Exception as e:
+            info(f"Error grabbing real title from release: {e}")
 
         try:
             # We re-guess the title from the details page
@@ -602,11 +624,11 @@ def ensure_correct_release_title(shared_state, details_html, release_id, title, 
             guessed_title = guess_title(shared_state, page_title, release_type, guess_tab)
             if guessed_title and guessed_title.lower() != title.lower():
                 info(f'Adjusted guessed release title to "{guessed_title}" from details page')
-                return guessed_title
-        except:
-            info(f"Failed to parse title from details page. Using original title: {title}")
+                return guessed_title, release_id
+        except Exception as e:
+            info(f"Error guessing release title from release: {e}")
 
-    return title
+    return title, release_id
 
 
 def extract_episode(title: str) -> int | None:
@@ -636,17 +658,16 @@ def get_al_download_links(shared_state, url, mirror, title, release_id):
         info(f"Failed to load details page for {title} at {url}")
         return {}
 
-    if int(release_id) < 1:
-        release_id = 1
-        info(f"No valid release ID found for {title} at {url}, falling back to {release_id}")
-
     episode_in_title = extract_episode(title)
     if episode_in_title:
         selection = episode_in_title - 1  # Convert to zero-based index
     else:
         selection = "cnl"
 
-    title = ensure_correct_release_title(shared_state, details_html, release_id, title, episode_in_title)
+    title, release_id = check_release(shared_state, details_html, release_id, title, episode_in_title)
+    if int(release_id) == 0:
+        info(f"No valid release ID found for {title} - Download failed!")
+        return {}
 
     anime_identifier = url.rstrip("/").split("/")[-1]
 
@@ -729,9 +750,13 @@ def get_al_download_links(shared_state, url, mirror, title, release_id):
                             message = response_json.get("message", "")
                             content_items = response_json.get("content", [])
 
-                            if code == "success" and content_items:
-                                info("CAPTCHA solved successfully on attempt {}.".format(tries))
-                                break
+                            if code == "success":
+                                if content_items:
+                                    info("CAPTCHA solved successfully on attempt {}.".format(tries))
+                                    break
+                                else:
+                                    info(f"CAPTCHA was solved, but no links are available for the selection!")
+                                    return {}
                             elif message == "cnl_login":
                                 info('Login expired, re-creating session...')
                                 invalidate_session(shared_state)
