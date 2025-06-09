@@ -160,7 +160,7 @@ def wd_feed(shared_state, start_time, request_from, mirror=None):
     except Exception as e:
         info(f"Error loading {hostname.upper()} feed: {e}")
         releases = []
-    debug(f"Time taken: {time.time() - start_time:.2f}s ({hostname.lower()})")
+    debug(f"Time taken: {time.time() - start_time:.2f}s ({hostname})")
     return releases
 
 
@@ -193,5 +193,5 @@ def wd_search(shared_state, start_time, request_from, search_string, mirror=None
     except Exception as e:
         info(f"Error loading {hostname.upper()} search: {e}")
         releases = []
-    debug(f"Time taken: {time.time() - start_time:.2f}s ({hostname.lower()})")
+    debug(f"Time taken: {time.time() - start_time:.2f}s ({hostname})")
     return releases

@@ -176,7 +176,7 @@ def sf_feed(shared_state, start_time, request_from, mirror=None):
                 info(f"Error parsing {hostname.upper()} feed: {e}")
 
     elapsed_time = time.time() - start_time
-    debug(f"Time taken: {elapsed_time:.2f} seconds ({hostname.lower()})")
+    debug(f"Time taken: {elapsed_time:.2f}s ({hostname})")
 
     return releases
 
@@ -370,5 +370,5 @@ def sf_search(shared_state, start_time, request_from, search_string, mirror=None
                 debug(f"Error parsing item for '{search_string}': {e}")
 
     elapsed_time = time.time() - start_time
-    debug(f"Time taken: {elapsed_time:.2f} seconds ({hostname.lower()})")
+    debug(f"Time taken: {elapsed_time:.2f}s ({hostname})")
     return releases
