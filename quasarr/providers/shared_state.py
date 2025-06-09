@@ -429,7 +429,6 @@ def convert_to_mb(item):
 
 
 def sanitize_title(title: str) -> str:
-    # 1) Map German umlauts and ß
     umlaut_map = {
         "Ä": "Ae", "ä": "ae",
         "Ö": "Oe", "ö": "oe",
@@ -439,29 +438,24 @@ def sanitize_title(title: str) -> str:
     for umlaut, replacement in umlaut_map.items():
         title = title.replace(umlaut, replacement)
 
-    # 2) Force to ASCII (drops any remaining non-ASCII)
     title = title.encode("ascii", errors="ignore").decode()
 
-    # 3) Replace slashes and spaces with dots
+    # Replace slashes and spaces with dots
     title = title.replace("/", "").replace(" ", ".")
-
-    # 4) Collapse runs of dots, strip leading/trailing dots,
-    #    and fix dot-hyphen-dot sequences
-    title = re.sub(r"\.{2,}", ".", title)  # multiple dots → one
     title = title.strip(".")  # no leading/trailing dots
     title = title.replace(".-.", "-")  # .-. → -
 
-    # 5) Finally, drop any chars except letters, digits, dots, hyphens, ampersands
-    title = re.sub(r"[^A-Za-z0-9\.\-\&]", "", title)
+    # Finally, drop any chars except letters, digits, dots, hyphens, ampersands
+    title = re.sub(r"[^A-Za-z0-9.\-&]", "", title)
 
+    # remove any repeated dots
+    title = re.sub(r"\.{2,}", ".", title)
     return title
 
 
 def sanitize_string(s):
     s = s.lower()
 
-    # Remove broken html entity
-    s = s.replace('& x27 ', "'")
     # Remove dots / pluses
     s = s.replace('.', ' ')
     s = s.replace('+', ' ')

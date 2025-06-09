@@ -84,7 +84,7 @@ def guess_title(shared_state, raw_base_title, release_type, block):
     """
 
     # Detect and extract “Season X” or “Staffel X” (Arabic or Roman)
-    base_title = raw_base_title
+    base_title = raw_base_title.replace("Anime Serie", "")
     season_str = ""
     m_season = re.search(r'(?i)\b(?:Season|Staffel)\s+(?P<num>\d+|[IVX]+)\b', base_title)
     if m_season:
@@ -125,27 +125,47 @@ def guess_title(shared_state, raw_base_title, release_type, block):
         else:
             ep_text = f"E{ep_range.zfill(2)}"
 
-    # Extract resolution, e.g. "720p" or "1080p"
-    res_text = ""
-    m_res = re.search(r":\s*([0-9]{3,4}p)", block.get_text(), re.IGNORECASE)
-    if m_res:
-        res_text = m_res.group(1)
+    # If both season_str and ep_text exist, merge into "SXXEYY"
+    if season_str and ep_text:
+        se_token = f"{season_str}{ep_text}"
+        base_and_se = formatted_base.rsplit(season_str, 1)[0] + se_token
+        parts = [base_and_se]
     else:
-        # Default to 1080p if no resolution is found
-        res_text = "1080p"
+        parts = [formatted_base]
+        if ep_text:
+            parts.append(ep_text)
 
-    # Extract release group, if present
-    span = block.find("span")
-    if span:
-        raw_grp_full = span.get_text()  # e.g. "Release Group: GroupName"
-        if ":" in raw_grp_full:
-            name = raw_grp_full.split(":", 1)[1].strip()
-        else:
-            name = raw_grp_full.strip()
-        # Remove spaces and hyphens in the group name
-        grp_text = name.replace(" ", "").replace("-", "")
+    # Check notes for hints of video source
+    notes = block.find("b")
+    if notes:
+        notes_text = notes.get_text(strip=True).lower()
     else:
-        grp_text = "Quasarr"
+        notes_text = ""
+
+    audio = ""
+    if re.search(r'\bflac\b', notes_text, re.IGNORECASE):
+        audio = "FLAC"
+    elif re.search(r'\baac\b', notes_text, re.IGNORECASE):
+        audio = "AAC"
+    elif re.search(r'\bopus\b', notes_text, re.IGNORECASE):
+        audio = "Opus"
+    elif re.search(r'\bmp3\b', notes_text, re.IGNORECASE):
+        audio = "MP3"
+    elif re.search(r'\bpcm\b', notes_text, re.IGNORECASE):
+        audio = "PCM"
+    elif re.search(r'\bdts\b', notes_text, re.IGNORECASE):
+        audio = "DTS"
+    elif re.search(r'\b(ac3|eac3)\b', notes_text, re.IGNORECASE):
+        audio = "AC3"
+
+    # Build language prefix per rules:
+    #  - Normalize audio type string to insert it into the title
+    #  - If audio has German AND Japanese → "German.DL"
+    #  - Else if >2 audio languages and German is one → "German.ML"
+    #  - Else if only German audio → "German"
+    #  - Else if any subtitle is German → "<language>.Subbed"
+    audio = audio.strip()
+    audio_type = f".{audio}" if audio else ""
 
     # Determine audio languages (icons before the closed-captioning icon)
     audio_langs = []
@@ -181,77 +201,68 @@ def guess_title(shared_state, raw_base_title, release_type, block):
                 else:
                     subtitle_langs.append(code.title())
 
-    # Build language prefix per rules:
-    #  - If audio has German AND Japanese → "German.DL"
-    #  - Else if >2 audio languages and German is one → "German.ML"
-    #  - Else if any subtitle is German → "German.Subbed"
     lang_prefix = ""
     if len(audio_langs) > 2 and "German" in audio_langs:
-        lang_prefix = "German.ML"
+        # e.g. German.5.1.ML or German.ML
+        lang_prefix = f"German{audio_type}.ML"
     elif "German" in audio_langs and "Japanese" in audio_langs:
-        lang_prefix = "German.DL"
+        # e.g. German.2.0.DL or German.DL
+        lang_prefix = f"German{audio_type}.DL"
+    elif "German" in audio_langs and len(audio_langs) == 1:
+        # e.g. German.2.0 or German
+        lang_prefix = f"German{audio_type}"
     elif audio_langs and "German" in subtitle_langs:
         lang_prefix = f"{audio_langs[0]}.Subbed"
 
-    # Assemble final title parts:
-    # If both season_str and ep_text exist, merge into "SXXEYY"
-    if season_str and ep_text:
-        se_token = f"{season_str}{ep_text}"
-        base_and_se = formatted_base.rsplit(season_str, 1)[0] + se_token
-        parts = [base_and_se]
-    else:
-        parts = [formatted_base]
-        if ep_text:
-            parts.append(ep_text)
-
     if lang_prefix:
         parts.append(lang_prefix)
+
+    # Extract resolution, e.g. "720p" or "1080p"
+    m_res = re.search(r":\s*([0-9]{3,4}p)", block.get_text(), re.IGNORECASE)
+    if m_res:
+        res_text = m_res.group(1)
+    else:
+        # Default to 1080p if no resolution is found
+        res_text = "1080p"
+
     if res_text:
         parts.append(res_text)
 
-    # Check notes for hints of video source
-    notes = block.find("b")
-    if notes:
-        notes_text = notes.get_text(strip=True).lower()
-    else:
-        notes_text = ""
-
-    source = "WEB-DL"
-    if "blu-ray" in notes_text or "bd" in notes_text or "bluray" in notes_text:
+    source = "WEB-DL"  # default to most common source
+    if re.search(r'\b(web-dl|webdl|webrip)\b', notes_text, re.IGNORECASE):
+        source = "WEB-DL"
+    elif re.search(r'\b(blu-ray|bd|bluray)\b', notes_text, re.IGNORECASE):
         source = "BluRay"
-    elif "hdtv" in notes_text or "tvrip" in notes_text:
+    elif re.search(r'\b(hdtv|tvrip)\b', notes_text, re.IGNORECASE):
         source = "HDTV"
     parts.append(source)
 
-    audio = "AC3"
-    if "flac" in notes_text:
-        audio = "FLAC"
-    elif "aac" in notes_text:
-        audio = "AAC"
-    elif "opus" in notes_text:
-        audio = "Opus"
-    elif "mp3" in notes_text:
-        audio = "MP3"
-    elif "pcm" in notes_text:
-        audio = "PCM"
-    elif "dts" in notes_text:
-        audio = "DTS"
-    parts.append(audio)
-
     video = "x264"
-    if "265" in notes_text or "hevc" in notes_text:
+    if re.search(r'\b(265|hevc)\b', notes_text, re.IGNORECASE):
         video = "x265"
-    elif "av1" in notes_text:
+    elif re.search(r'\bav1\b', notes_text, re.IGNORECASE):
         video = "AV1"
-    elif "avc" in notes_text:
+    elif re.search(r'\bavc\b', notes_text, re.IGNORECASE):
         video = "AVC"
-    elif "xvid" in notes_text:
+    elif re.search(r'\bxvid\b', notes_text, re.IGNORECASE):
         video = "Xvid"
     parts.append(video)
 
     # Join with dots
     candidate = ".".join(parts)
 
+    # Extract release group, if present
+    span = block.find("span")
+    if span:
+        raw_grp_full = span.get_text()  # e.g. "Release Group: GroupName"
+        if ":" in raw_grp_full:
+            name = raw_grp_full.split(":", 1)[1].strip()
+        else:
+            name = raw_grp_full.strip()
+        # Remove spaces and hyphens in the group name
+        grp_text = name.replace(" ", "").replace("-", "")
+    else:
+        grp_text = ""
     # Append the sanitized release group (dash + group) if present
     if grp_text:
         candidate = f"{candidate}-{grp_text}"
