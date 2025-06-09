@@ -193,7 +193,7 @@ def setup_arr_routes(app):
                                     <category id="2000" name="Movies" />
                                   </categories>
                                 </caps>'''
-                elif mode in ['movie', 'tvsearch']:
+                elif mode in ['movie', 'search', 'tvsearch']:
                     releases = []
 
                     if mode == 'movie':

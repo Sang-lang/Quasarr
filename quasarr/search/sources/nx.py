@@ -87,7 +87,7 @@ def nx_feed(shared_state, start_time, request_from, mirror=None):
             info(f"Error parsing {hostname.upper()} feed: {e}")
 
     elapsed_time = time.time() - start_time
-    debug(f"Time taken: {elapsed_time:.2f} seconds ({hostname.lower()})")
+    debug(f"Time taken: {elapsed_time:.2f}s ({hostname})")
 
     return releases
 
@@ -180,6 +180,6 @@ def nx_search(shared_state, start_time, request_from, search_string, mirror=None
             info(f"Error parsing {hostname.upper()} search: {e}")
 
     elapsed_time = time.time() - start_time
-    debug(f"Time taken: {elapsed_time:.2f} seconds ({hostname.lower()})")
+    debug(f"Time taken: {elapsed_time:.2f}s ({hostname})")
 
     return releases

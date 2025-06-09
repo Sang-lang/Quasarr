@@ -122,6 +122,6 @@ def dd_search(shared_state, start_time, request_from, search_string="", mirror=N
         info(f"Error loading {hostname.upper()} feed: {e}")
 
     elapsed_time = time.time() - start_time
-    debug(f"Time taken: {elapsed_time:.2f} seconds ({hostname.lower()})")
+    debug(f"Time taken: {elapsed_time:.2f}s ({hostname})")
 
     return releases
