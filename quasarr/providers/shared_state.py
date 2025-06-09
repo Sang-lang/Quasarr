@@ -320,7 +320,7 @@ def set_device_settings():
                  'filenameFilter': {
                      'enabled': True,
                      'matchType': 'CONTAINS',
-                     'regex': '.*\\.(sfv|jpe?g|idx|sub|srt|nfo|bat|txt|exe)',
+                     'regex': '.*\\.(sfv|jpe?g|idx|srt|nfo|bat|txt|exe)',
                      'useRegex': True
                  },
                  'filesizeFilter': {'enabled': False, 'from': 0, 'matchType': 'BETWEEN', 'to': 0},

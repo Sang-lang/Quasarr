@@ -11,7 +11,8 @@ from urllib.parse import urljoin, quote_plus
 
 from bs4 import BeautifulSoup
 
-from quasarr.downloads.sources.al import invalidate_session, fetch_via_requests_session
+from quasarr.downloads.sources.al import invalidate_session, fetch_via_requests_session, guess_title, \
+    build_guess_block_from_tab
 from quasarr.providers.imdb_metadata import get_localized_title
 from quasarr.providers.log import info, debug
 
@@ -49,20 +50,6 @@ def parse_relative_date(raw: str) -> datetime | None:
     return datetime.utcnow() - delta
 
 
-def roman_to_int(r: str) -> int:
-    roman_map = {'I': 1, 'V': 5, 'X': 10}
-    total = 0
-    prev = 0
-    for ch in r.upper()[::-1]:
-        val = roman_map.get(ch, 0)
-        if val < prev:
-            total -= val
-        else:
-            total += val
-        prev = val
-    return total
-
-
 def extract_size(text):
     match = re.match(r"(\d+(\.\d+)?) ([A-Za-z]+)", text)
     if match:
@@ -71,205 +58,6 @@ def extract_size(text):
         return {"size": size, "sizeunit": unit}
     else:
         raise ValueError(f"Invalid size format: {text}")
-
-
-def guess_title(shared_state, raw_base_title, release_type, block):
-    """
-    This is required as AL often does not provide proper titles in the feed or even details page.
-    Reconstructed titles will rarely match the original release names, as:
-    - The Video Source is not included in the feed.
-    - The Audio Quality / Source is not included in the feed.
-    - The Season is not included in the feed and must be reconstructed from the title, if present.
-    - The Release Group is optional and may not be present.
-    """
-
-    # Detect and extract “Season X” or “Staffel X” (Arabic or Roman)
-    base_title = raw_base_title.replace("Anime Serie", "")
-    season_str = ""
-    m_season = re.search(r'(?i)\b(?:Season|Staffel)\s+(?P<num>\d+|[IVX]+)\b', base_title)
-    if m_season:
-        num = m_season.group('num')
-        if num.isdigit():
-            season_num = int(num)
-        else:
-            season_num = roman_to_int(num)
-        season_str = f"S{season_num:02d}"
-        base_title = re.sub(
-            r'(?i)\b(?:Season|Staffel)\s+(?:\d+|[IVX]+)\b',
-            '',
-            base_title
-        ).strip()
-    elif release_type == "series":
-        # Default to Season 1 if it's a series and no season is mentioned
-        season_str = "S01"
-        if "rebellion r2" in base_title.lower():
-            season_str = "S02"
-
-    # Replace spaces → dots (colons removed later by sanitize_title)
-    formatted_base = base_title.replace(" ", ".")
-
-    # Re-insert season if found
-    if season_str:
-        formatted_base = f"{formatted_base}.{season_str}"
-
-    # Extract episode range, if present (accepts multi-digit ranges)
-    ep_text = ""
-    m_ep = re.search(r"Episode\s+(\d+(?:-\d+)?)", block.get_text())
-    if m_ep:
-        ep_range = m_ep.group(1)  # e.g. "001-260" or "09"
-        if "-" in ep_range:
-            start, end = ep_range.split("-")
-            start = start.zfill(2)
-            end = end.zfill(2)
-            ep_text = f"E{start}-{end}"
-        else:
-            ep_text = f"E{ep_range.zfill(2)}"
-
-    # If both season_str and ep_text exist, merge into "SXXEYY"
-    if season_str and ep_text:
-        se_token = f"{season_str}{ep_text}"
-        base_and_se = formatted_base.rsplit(season_str, 1)[0] + se_token
-        parts = [base_and_se]
-    else:
-        parts = [formatted_base]
-        if ep_text:
-            parts.append(ep_text)
-
-    # Check notes for hints of video source
-    notes = block.find("b")
-    if notes:
-        notes_text = notes.get_text(strip=True).lower()
-    else:
-        notes_text = ""
-
-    audio = ""
-    if re.search(r'\bflac\b', notes_text, re.IGNORECASE):
-        audio = "FLAC"
-    elif re.search(r'\baac\b', notes_text, re.IGNORECASE):
-        audio = "AAC"
-    elif re.search(r'\bopus\b', notes_text, re.IGNORECASE):
-        audio = "Opus"
-    elif re.search(r'\bmp3\b', notes_text, re.IGNORECASE):
-        audio = "MP3"
-    elif re.search(r'\bpcm\b', notes_text, re.IGNORECASE):
-        audio = "PCM"
-    elif re.search(r'\bdts\b', notes_text, re.IGNORECASE):
-        audio = "DTS"
-    elif re.search(r'\b(ac3|eac3)\b', notes_text, re.IGNORECASE):
-        audio = "AC3"
-
-    # Build language prefix per rules:
-    #  - Normalize audio type string to insert it into the title
-    #  - If audio has German AND Japanese → "German.DL"
-    #  - Else if >2 audio languages and German is one → "German.ML"
-    #  - Else if only German audio → "German"
-    #  - Else if any subtitle is German → "<language>.Subbed"
-    audio = audio.strip()
-    audio_type = f".{audio}" if audio else ""
-
-    # Determine audio languages (icons before the closed-captioning icon)
-    audio_langs = []
-    audio_icon = block.find("i", class_="fa-volume-up")
-    if audio_icon:
-        for sib in audio_icon.find_next_siblings():
-            if sib.name == "i" and "fa-closed-captioning" in sib.get("class", []):
-                break
-            if sib.name == "i" and "flag" in sib.get("class", []):
-                code = sib["class"][1].replace("flag-", "").lower()
-                if code == "jp":
-                    audio_langs.append("Japanese")
-                elif code == "de":
-                    audio_langs.append("German")
-                elif code == "en":
-                    audio_langs.append("English")
-                else:
-                    audio_langs.append(code.title())
-
-    # Determine subtitle languages (icons after the closed-captioning icon)
-    subtitle_langs = []
-    subtitle_icon = block.find("i", class_="fa-closed-captioning")
-    if subtitle_icon:
-        for sib in subtitle_icon.find_next_siblings():
-            if sib.name == "i" and "flag" in sib.get("class", []):
-                code = sib["class"][1].replace("flag-", "").lower()
-                if code == "de":
-                    subtitle_langs.append("German")
-                elif code == "jp":
-                    subtitle_langs.append("Japanese")
-                elif code == "en":
-                    subtitle_langs.append("English")
-                else:
-                    subtitle_langs.append(code.title())
-
-    lang_prefix = ""
-    if len(audio_langs) > 2 and "German" in audio_langs:
-        # e.g. German.5.1.ML or German.ML
-        lang_prefix = f"German{audio_type}.ML"
-    elif "German" in audio_langs and "Japanese" in audio_langs:
-        # e.g. German.2.0.DL or German.DL
-        lang_prefix = f"German{audio_type}.DL"
-    elif "German" in audio_langs and len(audio_langs) == 1:
-        # e.g. German.2.0 or German
-        lang_prefix = f"German{audio_type}"
-    elif audio_langs and "German" in subtitle_langs:
-        lang_prefix = f"{audio_langs[0]}.Subbed"
-
-    if lang_prefix:
-        parts.append(lang_prefix)
-
-    # Extract resolution, e.g. "720p" or "1080p"
-    m_res = re.search(r":\s*([0-9]{3,4}p)", block.get_text(), re.IGNORECASE)
-    if m_res:
-        res_text = m_res.group(1)
-    else:
-        # Default to 1080p if no resolution is found
-        res_text = "1080p"
-
-    if res_text:
-        parts.append(res_text)
-
-    source = "WEB-DL"  # default to most common source
-    if re.search(r'\b(web-dl|webdl|webrip)\b', notes_text, re.IGNORECASE):
-        source = "WEB-DL"
-    elif re.search(r'\b(blu-ray|bd|bluray)\b', notes_text, re.IGNORECASE):
-        source = "BluRay"
-    elif re.search(r'\b(hdtv|tvrip)\b', notes_text, re.IGNORECASE):
-        source = "HDTV"
-    parts.append(source)
-
-    video = "x264"
-    if re.search(r'\b(265|hevc)\b', notes_text, re.IGNORECASE):
-        video = "x265"
-    elif re.search(r'\bav1\b', notes_text, re.IGNORECASE):
-        video = "AV1"
-    elif re.search(r'\bavc\b', notes_text, re.IGNORECASE):
-        video = "AVC"
-    elif re.search(r'\bxvid\b', notes_text, re.IGNORECASE):
-        video = "Xvid"
-    parts.append(video)
-
-    # Join with dots
-    candidate = ".".join(parts)
-
-    # Extract release group, if present
-    span = block.find("span")
-    if span:
-        raw_grp_full = span.get_text()  # e.g. "Release Group: GroupName"
-        if ":" in raw_grp_full:
-            name = raw_grp_full.split(":", 1)[1].strip()
-        else:
-            name = raw_grp_full.strip()
-        # Remove spaces and hyphens in the group name
-        grp_text = name.replace(" ", "").replace("-", "")
-    else:
-        grp_text = ""
-    # Append the sanitized release group (dash + group) if present
-    if grp_text:
-        candidate = f"{candidate}-{grp_text}"
-
-    # Finally, sanitize the entire title: replace umlauts/ß, then strip invalid chars
-    sanitized_title = shared_state.sanitize_title(candidate)
-    return sanitized_title
 
 
 def get_release_id(tag):
@@ -390,73 +178,6 @@ def al_feed(shared_state, start_time, request_from, mirror=None):
     elapsed = time.time() - start_time
     debug(f"Time taken: {elapsed:.2f}s ({hostname})")
     return releases
-
-
-def _build_guess_block_from_tab(soup, tab):
-    """
-    Given a BeautifulSoup 'tab' for one <div id="download_X">…</div>, construct
-    and return a <div> containing exactly:
-      1) “: <resolution>” text so guess_title’s resolution regex can match
-      2) <i class="fa-volume-up">, then all audio <i class="flag"> icons
-      3) <i class="fa-closed-captioning">, then all subtitle <i class="flag"> icons
-      4) <span>Release Group: <grp_name></span> so guess_title picks up the group
-
-    This helper does not call guess_title itself; it merely builds the block.
-    """
-    fake_block = soup.new_tag("div")
-
-    # Resolution
-    res_td = tab.select_one("tr:has(th>i.fa-desktop) td")
-    if res_td:
-        res_val = res_td.get_text(strip=True)
-        resolution = "1080p"  # Default fallback
-
-        match = re.search(r'(\d+)\s*x\s*(\d+)', res_val)
-        if match:
-            width, height = match.groups()
-            height = height.lstrip('0')  # Remove leading zeros
-            if height.isdigit():
-                height_int = int(height)
-                if 2000 <= height_int < 3000:
-                    resolution = "2160p"
-                elif 1000 <= height_int < 2000:
-                    resolution = "1080p"
-                elif 690 <= height_int < 800:
-                    resolution = "720p"
-
-        fake_block.append(soup.new_string(f": {resolution}"))
-
-    # Audio languages
-    fake_block.append(soup.new_tag("i", **{"class": "fa-volume-up"}))
-    lang_tr = tab.select_one("tr:has(th>i.fa-volume-up)")
-    if lang_tr:
-        for icon in lang_tr.select("i.flag"):
-            fake_block.append(icon)
-
-    # Subtitles
-    fake_block.append(soup.new_tag("i", **{"class": "fa-closed-captioning"}))
-    sub_tr = tab.select_one("tr:has(th>i.fa-closed-captioning)")
-    if sub_tr:
-        for icon in sub_tr.select("i.flag"):
-            fake_block.append(icon)
-
-    # Release Group
-    grp_td = tab.select_one("tr:has(th>i.fa-child) td")
-    if grp_td:
-        grp_name = grp_td.get_text(strip=True).replace(" ", "").replace("-", "")
-        span = soup.new_tag("span")
-        span.string = f"Release Group: {grp_name}"
-        fake_block.append(span)
-
-    notes_td = tab.select_one("tr:has(th>i.fa-info) td")
-    if notes_td:
-        notes_text = notes_td.get_text(strip=True)
-        bold = soup.new_tag("b")
-        if notes_text:
-            bold.string = notes_text
-            fake_block.append(bold)
-
-    return fake_block
 
 
 def extract_season(title: str) -> int | None:
@@ -607,7 +328,7 @@ def al_search(shared_state, start_time, request_from, search_string,
 
                 # If no valid title from Release Notes, guess
                 if not final_title:
-                    fake_block = _build_guess_block_from_tab(content, tab)
+                    fake_block = build_guess_block_from_tab(tab)
                     final_title = guess_title(shared_state, title, valid_type, fake_block)
 
                 # Parse date
