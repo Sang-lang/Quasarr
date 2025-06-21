@@ -11,8 +11,8 @@ from urllib.parse import urljoin, quote_plus
 
 from bs4 import BeautifulSoup
 
-from quasarr.downloads.sources.al import invalidate_session, fetch_via_requests_session, guess_title, \
-    build_guess_block_from_tab
+from quasarr.downloads.sources.al import (invalidate_session, fetch_via_requests_session, guess_title,
+                                          parse_info_from_feed_entry, parse_info_from_download_item)
 from quasarr.providers.imdb_metadata import get_localized_title
 from quasarr.providers.log import info, debug
 
@@ -148,7 +148,8 @@ def al_feed(shared_state, start_time, request_from, mirror=None):
             mt_blocks = tr.find_all("div", class_="mt10")
             for block in mt_blocks:
                 release_id = get_release_id(block)
-                final_title = guess_title(shared_state, raw_base_title, release_type, block)
+                release_info = parse_info_from_feed_entry(block, raw_base_title, release_type)
+                final_title = guess_title(shared_state, raw_base_title, release_info)
 
                 # Build payload using final_title
                 mb = 0  # size not available in feed
@@ -304,32 +305,8 @@ def al_search(shared_state, start_time, request_from, search_string,
             for tab in download_tabs:
                 release_id += 1
 
-                # Attempt to get a release title from Release Notes
-                release_notes_td = None
-                for tr in tab.select("tr"):
-                    th = tr.select_one("th")
-                    if not th:
-                        continue
-                    icon = th.find("i", class_="fa-info")
-                    if icon:
-                        td = tr.select_one("td")
-                        if td and td.get_text(strip=True):
-                            release_notes_td = td
-                        break
-
-                final_title = None
-                if release_notes_td:
-                    raw_rn = release_notes_td.get_text(strip=True)
-                    rn_with_dots = raw_rn.replace(" ", ".")
-                    if "." in rn_with_dots and "-" in rn_with_dots:
-                        # Check if string ends with Group tag (word after dash) - this should prevent false positives
-                        if re.search(r"-[\s.]?\w+$", rn_with_dots):
-                            final_title = shared_state.sanitize_title(rn_with_dots)
-
-                # If no valid title from Release Notes, guess
-                if not final_title:
-                    fake_block = build_guess_block_from_tab(tab)
-                    final_title = guess_title(shared_state, title, valid_type, fake_block)
+                release_info = parse_info_from_download_item(tab, page_title=title,
+                                                             release_type=valid_type, requested_episode=episode)
 
                 # Parse date
                 date_td = tab.select_one("tr:has(th>i.fa-calendar-alt) td.modified")
@@ -358,50 +335,46 @@ def al_search(shared_state, start_time, request_from, search_string,
                         except Exception as e:
                             debug(f"Error extracting size for {title}: {e}")
 
-                if season:
-                    try:
-                        season_in_title = extract_season(final_title)
-                        if season_in_title and season_in_title != int(season):
-                            debug(f"Excluding {final_title} due to season mismatch: {season_in_title} != {season}")
-                            continue
-                    except Exception as e:
-                        debug(f"Error extracting season from title '{final_title}': {e}")
-
                 if episode:
                     try:
-                        episodes_div = tab.find("div", class_="episodes")
-                        if episodes_div:
-                            episode_links = episodes_div.find_all("a", attrs={"data-loop": re.compile(r"^\d+$")})
-                            total_episodes = len(episode_links)
-                            if total_episodes > 0:
-                                if mb > 0:
-                                    mb = int(mb / total_episodes)
-
-                                episode = int(episode)
-                                if 1 <= episode <= total_episodes:
-                                    match = re.search(r'(S\d{2,4})', final_title)
-                                    if match:
-                                        season = match.group(1)
-                                        final_title = final_title.replace(season, f"{season}E{episode:02d}")
+                        total_episodes = release_info.episode_max
+                        if total_episodes:
+                            if mb > 0:
+                                mb = int(mb / total_episodes)
+                            # Overwrite values so guessing the title only applies the requested episode
+                            release_info.episode_min = int(episode)
+                            release_info.episode_max = int(episode)
+                        else:  # if no total episode count - assume the requested episode is missing in the release
+                            continue
                     except ValueError:
                         pass
 
+                # If no valid title was grabbed from Release Notes, guess the title
+                if release_info.release_title:
+                    release_title = release_info.release_title
+                else:
+                    release_title = guess_title(shared_state, title, release_info)
+
+                if season and release_info.season != int(season):
+                    debug(f"Excluding {release_title} due to season mismatch: {release_info.season} != {season}")
+                    continue
+
                 payload = urlsafe_b64encode(
-                    f"{final_title}|{url}|{mirror}|{mb}|{release_id}|{imdb_id or ''}"
+                    f"{release_title}|{url}|{mirror}|{mb}|{release_id}|{imdb_id or ''}"
                     .encode("utf-8")
                 ).decode("utf-8")
                 link = f"{shared_state.values['internal_address']}/download/?payload={payload}"
 
                 releases.append({
                     "details": {
-                        "title": final_title,
+                        "title": release_title,
                         "hostname": hostname,
                         "imdb_id": imdb_id,
                         "link": link,
                         "mirror": mirror,
                         "size": mb * 1024 * 1024,
                         "date": date_str,
-                        "source": url
+                        "source": f"{url}#download_{release_id}"
                     },
                     "type": "protected"
                 })
