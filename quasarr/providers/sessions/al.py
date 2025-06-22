@@ -9,6 +9,7 @@ import urllib.parse
 
 import requests
 from bs4 import BeautifulSoup
+from requests.exceptions import Timeout, RequestException
 
 from quasarr.providers.log import info, debug
 
@@ -36,8 +37,16 @@ def create_and_persist_session(shared_state):
             "maxTimeout": 60000
         }
 
-        fs_resp = requests.post(flaresolverr_url, headers=fs_headers, json=fs_payload, timeout=30)
-        fs_resp.raise_for_status()
+        try:
+            fs_resp = requests.post(flaresolverr_url, headers=fs_headers, json=fs_payload, timeout=30)
+            fs_resp.raise_for_status()
+        except Timeout:
+            info(f"{hostname}: FlareSolverr request timed out")
+            return None
+        except RequestException as e:
+            # This covers HTTP errors and connection issues *other than* timeout
+            info(f"{hostname}: FlareSolverr server error: {e}")
+            return None
 
         fs_json = fs_resp.json()
         # Check if FlareSolverr actually solved the challenge
@@ -204,6 +213,16 @@ def fetch_via_flaresolverr(shared_state,
             timeout=timeout + 10
         )
         resp.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        info(f"Could not reach FlareSolverr: {e}")
+        return {
+            "status_code": None,
+            "headers": {},
+            "json": None,
+            "text": "",
+            "cookies": [],
+            "error": f"FlareSolverr request failed: {e}"
+        }
     except Exception as e:
         raise RuntimeError(f"Could not reach FlareSolverr: {e}")
 
