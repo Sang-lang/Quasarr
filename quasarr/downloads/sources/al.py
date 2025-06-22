@@ -25,8 +25,9 @@ class ReleaseInfo:
     audio_langs: List[str]
     subtitle_langs: List[str]
     resolution: str
-    source: str
+    audio: str
     video: str
+    source: str
     release_group: str
     season_part: Optional[int]
     season: Optional[int]
@@ -48,21 +49,65 @@ def roman_to_int(r: str) -> int:
     return total
 
 
-def parse_info_from_feed_entry(block, raw_base_title, release_type) -> ReleaseInfo:
+def extract_season_number_from_title(page_title, release_type, release_title=""):
+    """
+    Extracts the season number from the given page title.
+
+    Priority is given to standard patterns like S01/E01 or R2 in the optional release title.
+    If no match is found, it attempts to extract based on keywords like "Season"/"Staffel"
+    or trailing numbers/roman numerals in the page title.
+
+    Args:
+        page_title (str): The title of the page, used as a fallback.
+        release_type (str): The type of release (e.g., 'series').
+        release_title (Optional, str): The title of the release.
+
+    Returns:
+        int: The extracted or inferred season number. Defaults to 1 if not found.
+    """
+
+    season_num = None
+
+    if release_title:
+        match = re.search(r'\.(?:S(\d{1,4})|R(2))(?:E\d{1,4})?', release_title, re.IGNORECASE)
+        if match:
+            if match.group(1) is not None:
+                season_num = int(match.group(1))
+            elif match.group(2) is not None:
+                season_num = int(match.group(2))
+
+    if season_num is None:
+        page_title = page_title or ""
+        if "staffel" in page_title.lower() or "season" in page_title.lower() or release_type == "series":
+            match = re.search(r'\b(?:Season|Staffel)\s+(\d+|[IVX]+)\b|\bR(2)\b', page_title, re.IGNORECASE)
+            if match:
+                if match.group(1) is not None:
+                    num = match.group(1)
+                    season_num = int(num) if num.isdigit() else roman_to_int(num)
+                elif match.group(2) is not None:
+                    season_num = int(match.group(2))
+            else:
+                trailing_match = re.search(r'\s+([2-9]\d*|[IVXLCDM]+)\s*$', page_title, re.IGNORECASE)
+                if trailing_match:
+                    num = trailing_match.group(1)
+                    season_candidate = int(num) if num.isdigit() else roman_to_int(num)
+                    if season_candidate >= 2:
+                        season_num = season_candidate
+
+            if season_num is None:
+                season_num = 1
+
+    return season_num
+
+
+def parse_info_from_feed_entry(block, series_page_title, release_type) -> ReleaseInfo:
     """
     Parse a BeautifulSoup block from the feed entry into ReleaseInfo.
     """
     text = block.get_text(separator=" ", strip=True)
 
     # detect season
-    season_num: Optional[int] = None
-    m_season = re.search(r'(?i)\b(?:Season|Staffel)\s+(\d+|[IVX]+)\b', raw_base_title)
-    if m_season:
-        num = m_season.group(1)
-        season_num = int(num) if num.isdigit() else roman_to_int(num)
-    if not season_num and release_type == "series":
-        # if no season number was detected, but the release type is series, assume season 1
-        season_num = 1
+    season_num = extract_season_number_from_title(series_page_title, release_type)
 
     # detect episodes
     episode_min: Optional[int] = None
@@ -113,8 +158,9 @@ def parse_info_from_feed_entry(block, raw_base_title, release_type) -> ReleaseIn
         audio_langs=audio_langs,
         subtitle_langs=subtitle_langs,
         resolution=resolution,
-        source=source,
+        audio="",
         video=video,
+        source=source,
         release_group=release_group,
         season_part=None,
         season=season_num,
@@ -160,6 +206,24 @@ def parse_info_from_download_item(tab, page_title=None, release_type=None, reque
     subtitle_langs = [{'jp': 'Japanese', 'de': 'German', 'en': 'English'}.get(c, c.title())
                       for c in sub_codes]
 
+    # audio codec
+    if "flac" in notes_lower:
+        audio = "FLAC"
+    elif "aac" in notes_lower:
+        audio = "AAC"
+    elif "opus" in notes_lower:
+        audio = "Opus"
+    elif "mp3" in notes_lower:
+        audio = "MP3"
+    elif "pcm" in notes_lower:
+        audio = "PCM"
+    elif "dts" in notes_lower:
+        audio = "DTS"
+    elif "ac3" in notes_lower or "eac3" in notes_lower:
+        audio = "AC3"
+    else:
+        audio = ""
+
     # source
     if re.search(r"(web-dl|webdl|webrip)", notes_lower):
         source = "WEB-DL"
@@ -170,15 +234,18 @@ def parse_info_from_download_item(tab, page_title=None, release_type=None, reque
     else:
         source = "WEB-DL"
 
-    # video codec
-    if re.search(r"(265|hevc)", notes_lower):
+    if "265" in notes_lower or "hevc" in notes_lower:
         video = "x265"
-    elif re.search(r"av1", notes_lower):
+    elif "av1" in notes_lower:
         video = "AV1"
-    elif re.search(r"avc", notes_lower):
+    elif "avc" in notes_lower:
         video = "AVC"
-    elif re.search(r"xvid", notes_lower):
+    elif "xvid" in notes_lower:
         video = "Xvid"
+    elif "mpeg" in notes_lower:
+        video = "MPEG"
+    elif "vc-1" in notes_lower:
+        video = "VC-1"
     else:
         video = "x264"
 
@@ -190,37 +257,17 @@ def parse_info_from_download_item(tab, page_title=None, release_type=None, reque
     else:
         release_group = ""
 
-    # determine season or fallback
-    season_num: Optional[int] = None
-    if release_title:
-        match = re.search(r'\.(?:S(\d{1,4})|R([1-9]))(?:E\d{1,4})?', release_title, re.IGNORECASE)
-        if match:
-            if match.group(1) is not None:
-                season_num = int(match.group(1))
-            elif match.group(2) is not None:
-                season_num = int(match.group(2))
-    if season_num is None:
-        if not page_title:
-            page_title = ""
-        if "staffel" in page_title.lower() or "season" in page_title.lower() or release_type == "series":
-            match = re.search(r'\b(?:Season|Staffel)\s+(\d+|[IVX]+)\b|\bR(2)\b', page_title, re.IGNORECASE)
-            if match:
-                if match.group(1) is not None:
-                    num = match.group(1)
-                    season_num = int(num) if num.isdigit() else roman_to_int(num)
-                elif match.group(2) is not None:
-                    season_num = int(match.group(2))
-            else:
-                season_num = 1  # fallback default if keywords are present but no number found
+    # determine season
+    season_num = extract_season_number_from_title(page_title, release_type, release_title=release_title)
 
-    # check if part in title
-    part: Optional[int] = None
+    # check if season part info is present
+    season_part: Optional[int] = None
     if page_title:
         match = re.search(r'(?i)\b(?:Part|Teil)\s+(\d+|[IVX]+)\b', page_title, re.IGNORECASE)
         if match:
             num = match.group(1)
-            part = int(num) if num.isdigit() else roman_to_int(num)
-            part_string = f"Part.{part}"
+            season_part = int(num) if num.isdigit() else roman_to_int(num)
+            part_string = f"Part.{season_part}"
             if release_title and part_string not in release_title:
                 release_title = re.sub(r"\.(German|Japanese|English)\.", f".{part_string}.\\1.", release_title, 1)
 
@@ -251,19 +298,20 @@ def parse_info_from_download_item(tab, page_title=None, release_type=None, reque
         audio_langs=audio_langs,
         subtitle_langs=subtitle_langs,
         resolution=resolution,
-        source=source,
+        audio=audio,
         video=video,
+        source=source,
         release_group=release_group,
-        season_part=part,
+        season_part=season_part,
         season=season_num,
         episode_min=episode_min,
         episode_max=episode_max
     )
 
 
-def guess_title(shared_state, raw_base_title, release_info: ReleaseInfo) -> str:
+def guess_title(shared_state, page_title, release_info: ReleaseInfo) -> str:
     # remove labels
-    clean_title = raw_base_title.rsplit('(', 1)[0].strip()
+    clean_title = page_title.rsplit('(', 1)[0].strip()
     # Remove season/staffel info
     pattern = r'(?i)\b(?:Season|Staffel)\s*\.?\s*\d+\b|\bR\d+\b'
     clean_title = re.sub(pattern, '', clean_title)
@@ -299,13 +347,16 @@ def guess_title(shared_state, raw_base_title, release_info: ReleaseInfo) -> str:
     a, su = release_info.audio_langs, release_info.subtitle_langs
     if len(a) > 2 and 'German' in a:
         prefix = 'German.ML'
-    elif 'German' in a and 'Japanese' in a:
+    elif len(a) == 2 and 'German' in a:
         prefix = 'German.DL'
-    elif 'German' in a and len(a) == 1:
+    elif len(a) == 1 and 'German' in a:
         prefix = 'German'
     elif a and 'German' in su:
         prefix = f"{a[0]}.Subbed"
     if prefix: parts.append(prefix)
+
+    if release_info.audio:
+        parts.append(release_info.audio)
 
     parts.extend([release_info.resolution, release_info.source, release_info.video])
     title = '.'.join(parts)

@@ -230,7 +230,7 @@ def sf_search(shared_state, start_time, request_from, search_string, mirror=None
         sanitized_search_string = shared_state.sanitize_string(search_string)
         sanitized_title = shared_state.sanitize_string(result.get("title", ""))
         if not re.search(rf'\b{re.escape(sanitized_search_string)}\b', sanitized_title):
-            debug(f"Search string '{search_string}' does not match '{result.get('title')}'")
+            debug(f"Search string '{search_string}' doesn't match '{result.get('title')}'")
             continue
         debug(f"Matched search string '{search_string}' with result '{result.get('title')}'")
 

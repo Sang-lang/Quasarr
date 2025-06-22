@@ -256,7 +256,7 @@ def al_search(shared_state, start_time, request_from, search_string,
             sanitized_search_string = shared_state.sanitize_string(search_string)
             sanitized_title = shared_state.sanitize_string(name)
             if not re.search(rf'\b{re.escape(sanitized_search_string)}\b', sanitized_title):
-                debug(f"Search string '{search_string}' does not match '{name}'")
+                debug(f"Search string '{search_string}' doesn't match '{name}'")
                 continue
             debug(f"Matched search string '{search_string}' with result '{name}'")
 
