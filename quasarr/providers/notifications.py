@@ -19,7 +19,7 @@ if os.getenv('SILENT'):
     silent = True
 
 
-def send_discord_message(shared_state, title, case, imdb_id=None, details=None):
+def send_discord_message(shared_state, title, case, imdb_id=None, details=None, source=None):
     """
     Sends a Discord message to the webhook provided in the shared state, based on the specified case.
 
@@ -27,6 +27,8 @@ def send_discord_message(shared_state, title, case, imdb_id=None, details=None):
     :param title: Title of the embed to be sent.
     :param case: A string representing the scenario (e.g., 'captcha', 'failed', 'unprotected').
     :param imdb_id: A string starting with "tt" followed by at least 7 digits, representing an object on IMDb
+    :param details: A dictionary containing additional details, such as version and link for updates.
+    :param source: Optional source of the notification, sent as a field in the embed.
     :return: True if the message was sent successfully, False otherwise.
     """
     if not shared_state.values.get("discord"):
@@ -65,7 +67,7 @@ def send_discord_message(shared_state, title, case, imdb_id=None, details=None):
             fields.append({
                 'name': 'SponsorsHelper',
                 'value': f'[Sponsors get automated CAPTCHA solutions!](https://github.com/rix1337/Quasarr?tab=readme-ov-file#sponsorshelper)',
-            }, )
+            })
     elif case == "quasarr_update":
         description = f'Please update to {details["version"]} as soon as possible!'
         if details:
@@ -89,6 +91,14 @@ def send_discord_message(shared_state, title, case, imdb_id=None, details=None):
             'description': description,
         }]
     }
+
+    if source and source.startswith("http"):
+        if not fields:
+            fields = []
+        fields.append({
+            'name': 'Source',
+            'value': f'[View release details here]({source})',
+        })
 
     if fields:
         data['embeds'][0]['fields'] = fields
