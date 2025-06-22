@@ -7,7 +7,7 @@ import time
 from base64 import urlsafe_b64encode
 from datetime import datetime, timezone
 
-from quasarr.downloads.sources.dd import create_and_persist_session, retrieve_and_validate_session
+from quasarr.providers.sessions.dd import create_and_persist_session, retrieve_and_validate_session
 from quasarr.providers.imdb_metadata import get_localized_title
 from quasarr.providers.log import info, debug
 

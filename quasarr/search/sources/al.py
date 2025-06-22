@@ -11,8 +11,9 @@ from urllib.parse import urljoin, quote_plus
 
 from bs4 import BeautifulSoup
 
-from quasarr.downloads.sources.al import (invalidate_session, fetch_via_requests_session, guess_title,
+from quasarr.downloads.sources.al import (guess_title,
                                           parse_info_from_feed_entry, parse_info_from_download_item)
+from quasarr.providers.sessions.al import invalidate_session, fetch_via_requests_session
 from quasarr.providers.imdb_metadata import get_localized_title
 from quasarr.providers.log import info, debug
 
