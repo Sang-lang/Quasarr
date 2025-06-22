@@ -4,273 +4,35 @@
 
 import base64
 import json
-import pickle
+import re
 import time
-import urllib.parse
+from dataclasses import dataclass
 from typing import Optional, List
 
-import requests
+from bs4 import BeautifulSoup
 
 from quasarr.downloads.linkcrypters.al import decrypt_content, solve_captcha
 from quasarr.providers.log import info, debug
+from quasarr.providers.sessions.al import retrieve_and_validate_session, invalidate_session, unwrap_flaresolverr_body, \
+    fetch_via_flaresolverr, fetch_via_requests_session
 
 hostname = "al"
 
-import re
-from bs4 import BeautifulSoup
-from dataclasses import dataclass
 
-
-def create_and_persist_session(shared_state):
-    cfg = shared_state.values["config"]("Hostnames")
-    host = cfg.get(hostname)
-    credentials_cfg = shared_state.values["config"](hostname.upper())
-    user = credentials_cfg.get("user")
-    pw = credentials_cfg.get("password")
-
-    flaresolverr_url = shared_state.values["config"]('FlareSolverr').get('url')
-
-    sess = requests.Session()
-
-    # Prime cookies via FlareSolverr
-    try:
-        info(f'Priming "{hostname}" session via FlareSolverr...')
-        fs_headers = {"Content-Type": "application/json"}
-        fs_payload = {
-            "cmd": "request.get",
-            "url": f"https://www.{host}/",
-            "maxTimeout": 60000
-        }
-
-        fs_resp = requests.post(flaresolverr_url, headers=fs_headers, json=fs_payload, timeout=30)
-        fs_resp.raise_for_status()
-
-        fs_json = fs_resp.json()
-        # Check if FlareSolverr actually solved the challenge
-        if fs_json.get("status") != "ok" or "solution" not in fs_json:
-            info(f"{hostname}: FlareSolverr did not return a valid solution")
-            return None
-
-        solution = fs_json["solution"]
-        # store FlareSolverr’s UA into our requests.Session
-        fl_ua = solution.get("userAgent")
-        if fl_ua:
-            sess.headers.update({'User-Agent': fl_ua})
-
-        # Extract any cookies returned by FlareSolverr and add them into our session
-        for ck in solution.get("cookies", []):
-            name = ck.get("name")
-            value = ck.get("value")
-            domain = ck.get("domain")
-            path = ck.get("path", "/")
-            # Set cookie on the session (ignoring expires/secure/httpOnly)
-            sess.cookies.set(name, value, domain=domain, path=path)
-
-    except Exception as e:
-        debug(f'Could not prime "{hostname}" session via FlareSolverr: {e}')
-        return None
-
-    if user and pw:
-        data = {
-            "identity": user,
-            "password": pw,
-            "remember": "1"
-        }
-        encoded_data = urllib.parse.urlencode(data)
-
-        login_headers = {
-            "Content-Type": "application/x-www-form-urlencoded"
-        }
-
-        r = sess.post(f'https://www.{host}/auth/signin',
-                      data=encoded_data,
-                      headers=login_headers,
-                      timeout=30)
-
-        if r.status_code != 200 or "invalid" in r.text.lower():
-            info(f'Login failed: "{hostname}" - {r.status_code} - {r.text}')
-            return None
-        info(f'Login successful: "{hostname}"')
-    else:
-        info(f'Missing credentials for: "{hostname}" - skipping login')
-        return None
-
-    blob = pickle.dumps(sess)
-    token = base64.b64encode(blob).decode("utf-8")
-    shared_state.values["database"]("sessions").update_store(hostname, token)
-    return sess
-
-
-def retrieve_and_validate_session(shared_state):
-    db = shared_state.values["database"]("sessions")
-    token = db.retrieve(hostname)
-    if not token:
-        return create_and_persist_session(shared_state)
-
-    try:
-        blob = base64.b64decode(token.encode("utf-8"))
-        sess = pickle.loads(blob)
-        if not isinstance(sess, requests.Session):
-            raise ValueError("Not a Session")
-    except Exception as e:
-        debug(f"{hostname}: session load failed: {e}")
-        return create_and_persist_session(shared_state)
-
-    return sess
-
-
-def invalidate_session(shared_state):
-    db = shared_state.values["database"]("sessions")
-    db.delete(hostname)
-    debug(f'Session for "{hostname}" marked as invalid!')
-
-
-def _persist_session_to_db(shared_state, sess):
-    """
-    Serialize & store the given requests.Session into the database under `hostname`.
-    """
-    blob = pickle.dumps(sess)
-    token = base64.b64encode(blob).decode("utf-8")
-    shared_state.values["database"]("sessions").update_store(hostname, token)
-
-
-def _load_session_cookies_for_flaresolverr(sess):
-    """
-    Convert a requests.Session's cookies into FlareSolverr‐style list of dicts.
-    """
-    cookie_list = []
-    for ck in sess.cookies:
-        cookie_list.append({
-            "name": ck.name,
-            "value": ck.value,
-            "domain": ck.domain,
-            "path": ck.path or "/",
-        })
-    return cookie_list
-
-
-def unwrap_flaresolverr_body(raw_text: str) -> str:
-    """
-    Use BeautifulSoup to remove any HTML tags and return the raw text.
-    If raw_text is:
-        <html><body>{"foo":123}</body></html>
-    or:
-        <html><body><pre>[...array...]</pre></body></html>
-    or even just:
-        {"foo":123}
-    this will return the inner JSON string in all cases.
-    """
-    soup = BeautifulSoup(raw_text, "html.parser")
-    text = soup.get_text().strip()
-    return text
-
-
-def fetch_via_flaresolverr(shared_state,
-                           method: str,
-                           target_url: str,
-                           post_data: dict = None,
-                           timeout: int = 60):
-    """
-    Load (or recreate) the requests.Session from DB.
-    Package its cookies into FlareSolverr payload.
-    Ask FlareSolverr to do a request.get or request.post on target_url.
-    Replace the Session’s cookies with FlareSolverr’s new cookies.
-    Re-persist the updated session to the DB.
-    Return a dict with “status_code”, “headers”, “json” (parsed - if available), “text” and “cookies”.
-
-    – method: "GET" or "POST"
-    – post_data: dict of form‐fields if method=="POST"
-    – timeout: seconds (FlareSolverr’s internal maxTimeout = timeout*1000 ms)
-    """
-    flaresolverr_url = shared_state.values["config"]('FlareSolverr').get('url')
-
-    sess = retrieve_and_validate_session(shared_state)
-
-    cmd = "request.get" if method.upper() == "GET" else "request.post"
-    fs_payload = {
-        "cmd": cmd,
-        "url": target_url,
-        "maxTimeout": timeout * 1000,
-        # Inject every cookie from our Python session into FlareSolverr
-        "cookies": _load_session_cookies_for_flaresolverr(sess)
-    }
-
-    if method.upper() == "POST":
-        # FlareSolverr expects postData as urlencoded string
-        encoded = urllib.parse.urlencode(post_data or {})
-        fs_payload["postData"] = encoded
-
-    # Send the JSON request to FlareSolverr
-    fs_headers = {"Content-Type": "application/json"}
-    try:
-        resp = requests.post(
-            flaresolverr_url,
-            headers=fs_headers,
-            json=fs_payload,
-            timeout=timeout + 10
-        )
-        resp.raise_for_status()
-    except Exception as e:
-        raise RuntimeError(f"Could not reach FlareSolverr: {e}")
-
-    fs_json = resp.json()
-    if fs_json.get("status") != "ok" or "solution" not in fs_json:
-        raise RuntimeError(f"FlareSolverr did not return a valid solution: {fs_json.get('message', '<no message>')}")
-
-    solution = fs_json["solution"]
-
-    # Extract the raw HTML/JSON body that FlareSolverr fetched
-    raw_body = solution.get("response", "")
-    # Get raw body as text, since it might contain JSON
-    unwrapped = unwrap_flaresolverr_body(raw_body)
-
-    # Attempt to parse it as JSON
-    try:
-        parsed_json = json.loads(unwrapped)
-    except ValueError:
-        parsed_json = None
-
-    # Replace our requests.Session cookies with whatever FlareSolverr solved
-    sess.cookies.clear()
-    for ck in solution.get("cookies", []):
-        sess.cookies.set(
-            ck.get("name"),
-            ck.get("value"),
-            domain=ck.get("domain"),
-            path=ck.get("path", "/")
-        )
-
-    # Persist the updated Session back into your DB
-    _persist_session_to_db(shared_state, sess)
-
-    # Return a small dict containing status, headers, parsed JSON, and cookie list
-    return {
-        "status_code": solution.get("status"),
-        "headers": solution.get("headers", {}),
-        "json": parsed_json,
-        "text": raw_body,
-        "cookies": solution.get("cookies", [])
-    }
-
-
-def fetch_via_requests_session(shared_state, method: str, target_url: str, post_data: dict = None, timeout: int = 30):
-    """
-    – method: "GET" or "POST"
-    – post_data: for POST only (will be sent as form-data unless you explicitly JSON-encode)
-    – timeout: seconds
-    """
-    sess = retrieve_and_validate_session(shared_state)
-
-    # Execute request
-    if method.upper() == "GET":
-        resp = sess.get(target_url, timeout=timeout)
-    else:  # POST
-        resp = sess.post(target_url, data=post_data, timeout=timeout)
-
-    # Re-persist cookies, since the site might have modified them during the request
-    _persist_session_to_db(shared_state, sess)
-
-    return resp
+@dataclass
+class ReleaseInfo:
+    release_title: Optional[str]
+    audio_langs: List[str]
+    subtitle_langs: List[str]
+    resolution: str
+    audio: str
+    video: str
+    source: str
+    release_group: str
+    season_part: Optional[int]
+    season: Optional[int]
+    episode_min: Optional[int]
+    episode_max: Optional[int]
 
 
 def roman_to_int(r: str) -> int:
@@ -287,36 +49,65 @@ def roman_to_int(r: str) -> int:
     return total
 
 
-@dataclass
-class ReleaseInfo:
-    release_title: Optional[str]  # the real release title, if available
-    audio_langs: List[str]
-    subtitle_langs: List[str]
-    resolution: str
-    source: str
-    video: str
-    release_group: str
-    season_part: Optional[int]  # must be appended to title if not None
-    season: Optional[int]  # season number (None if not detected)
-    episode_min: Optional[int]  # first episode number (None if not detected)
-    episode_max: Optional[int]  # last episode number (same as episode_min if single)
+def extract_season_number_from_title(page_title, release_type, release_title=""):
+    """
+    Extracts the season number from the given page title.
+
+    Priority is given to standard patterns like S01/E01 or R2 in the optional release title.
+    If no match is found, it attempts to extract based on keywords like "Season"/"Staffel"
+    or trailing numbers/roman numerals in the page title.
+
+    Args:
+        page_title (str): The title of the page, used as a fallback.
+        release_type (str): The type of release (e.g., 'series').
+        release_title (Optional, str): The title of the release.
+
+    Returns:
+        int: The extracted or inferred season number. Defaults to 1 if not found.
+    """
+
+    season_num = None
+
+    if release_title:
+        match = re.search(r'\.(?:S(\d{1,4})|R(2))(?:E\d{1,4})?', release_title, re.IGNORECASE)
+        if match:
+            if match.group(1) is not None:
+                season_num = int(match.group(1))
+            elif match.group(2) is not None:
+                season_num = int(match.group(2))
+
+    if season_num is None:
+        page_title = page_title or ""
+        if "staffel" in page_title.lower() or "season" in page_title.lower() or release_type == "series":
+            match = re.search(r'\b(?:Season|Staffel)\s+(\d+|[IVX]+)\b|\bR(2)\b', page_title, re.IGNORECASE)
+            if match:
+                if match.group(1) is not None:
+                    num = match.group(1)
+                    season_num = int(num) if num.isdigit() else roman_to_int(num)
+                elif match.group(2) is not None:
+                    season_num = int(match.group(2))
+            else:
+                trailing_match = re.search(r'\s+([2-9]\d*|[IVXLCDM]+)\s*$', page_title, re.IGNORECASE)
+                if trailing_match:
+                    num = trailing_match.group(1)
+                    season_candidate = int(num) if num.isdigit() else roman_to_int(num)
+                    if season_candidate >= 2:
+                        season_num = season_candidate
+
+            if season_num is None:
+                season_num = 1
+
+    return season_num
 
 
-def parse_info_from_feed_entry(block, raw_base_title, release_type) -> ReleaseInfo:
+def parse_info_from_feed_entry(block, series_page_title, release_type) -> ReleaseInfo:
     """
     Parse a BeautifulSoup block from the feed entry into ReleaseInfo.
     """
     text = block.get_text(separator=" ", strip=True)
 
     # detect season
-    season_num: Optional[int] = None
-    m_season = re.search(r'(?i)\b(?:Season|Staffel)\s+(\d+|[IVX]+)\b', raw_base_title)
-    if m_season:
-        num = m_season.group(1)
-        season_num = int(num) if num.isdigit() else roman_to_int(num)
-    if not season_num and release_type == "series":
-        # if no season number was detected, but the release type is series, assume season 1
-        season_num = 1
+    season_num = extract_season_number_from_title(series_page_title, release_type)
 
     # detect episodes
     episode_min: Optional[int] = None
@@ -367,8 +158,9 @@ def parse_info_from_feed_entry(block, raw_base_title, release_type) -> ReleaseIn
         audio_langs=audio_langs,
         subtitle_langs=subtitle_langs,
         resolution=resolution,
-        source=source,
+        audio="",
         video=video,
+        source=source,
         release_group=release_group,
         season_part=None,
         season=season_num,
@@ -414,6 +206,24 @@ def parse_info_from_download_item(tab, page_title=None, release_type=None, reque
     subtitle_langs = [{'jp': 'Japanese', 'de': 'German', 'en': 'English'}.get(c, c.title())
                       for c in sub_codes]
 
+    # audio codec
+    if "flac" in notes_lower:
+        audio = "FLAC"
+    elif "aac" in notes_lower:
+        audio = "AAC"
+    elif "opus" in notes_lower:
+        audio = "Opus"
+    elif "mp3" in notes_lower:
+        audio = "MP3"
+    elif "pcm" in notes_lower:
+        audio = "PCM"
+    elif "dts" in notes_lower:
+        audio = "DTS"
+    elif "ac3" in notes_lower or "eac3" in notes_lower:
+        audio = "AC3"
+    else:
+        audio = ""
+
     # source
     if re.search(r"(web-dl|webdl|webrip)", notes_lower):
         source = "WEB-DL"
@@ -424,15 +234,18 @@ def parse_info_from_download_item(tab, page_title=None, release_type=None, reque
     else:
         source = "WEB-DL"
 
-    # video codec
-    if re.search(r"(265|hevc)", notes_lower):
+    if "265" in notes_lower or "hevc" in notes_lower:
         video = "x265"
-    elif re.search(r"av1", notes_lower):
+    elif "av1" in notes_lower:
         video = "AV1"
-    elif re.search(r"avc", notes_lower):
+    elif "avc" in notes_lower:
         video = "AVC"
-    elif re.search(r"xvid", notes_lower):
+    elif "xvid" in notes_lower:
         video = "Xvid"
+    elif "mpeg" in notes_lower:
+        video = "MPEG"
+    elif "vc-1" in notes_lower:
+        video = "VC-1"
     else:
         video = "x264"
 
@@ -444,37 +257,17 @@ def parse_info_from_download_item(tab, page_title=None, release_type=None, reque
     else:
         release_group = ""
 
-    # determine season or fallback
-    season_num: Optional[int] = None
-    if release_title:
-        match = re.search(r'\.(?:S(\d{1,4})|R([1-9]))(?:E\d{1,4})?', release_title, re.IGNORECASE)
-        if match:
-            if match.group(1) is not None:
-                season_num = int(match.group(1))
-            elif match.group(2) is not None:
-                season_num = int(match.group(2))
-    if season_num is None:
-        if not page_title:
-            page_title = ""
-        if "staffel" in page_title.lower() or "season" in page_title.lower() or release_type == "series":
-            match = re.search(r'\b(?:Season|Staffel)\s+(\d+|[IVX]+)\b|\bR(2)\b', page_title, re.IGNORECASE)
-            if match:
-                if match.group(1) is not None:
-                    num = match.group(1)
-                    season_num = int(num) if num.isdigit() else roman_to_int(num)
-                elif match.group(2) is not None:
-                    season_num = int(match.group(2))
-            else:
-                season_num = 1  # fallback default if keywords are present but no number found
+    # determine season
+    season_num = extract_season_number_from_title(page_title, release_type, release_title=release_title)
 
-    # check if part in title
-    part: Optional[int] = None
+    # check if season part info is present
+    season_part: Optional[int] = None
     if page_title:
         match = re.search(r'(?i)\b(?:Part|Teil)\s+(\d+|[IVX]+)\b', page_title, re.IGNORECASE)
         if match:
             num = match.group(1)
-            part = int(num) if num.isdigit() else roman_to_int(num)
-            part_string = f"Part.{part}"
+            season_part = int(num) if num.isdigit() else roman_to_int(num)
+            part_string = f"Part.{season_part}"
             if release_title and part_string not in release_title:
                 release_title = re.sub(r"\.(German|Japanese|English)\.", f".{part_string}.\\1.", release_title, 1)
 
@@ -505,19 +298,20 @@ def parse_info_from_download_item(tab, page_title=None, release_type=None, reque
         audio_langs=audio_langs,
         subtitle_langs=subtitle_langs,
         resolution=resolution,
-        source=source,
+        audio=audio,
         video=video,
+        source=source,
         release_group=release_group,
-        season_part=part,
+        season_part=season_part,
         season=season_num,
         episode_min=episode_min,
         episode_max=episode_max
     )
 
 
-def guess_title(shared_state, raw_base_title, release_info: ReleaseInfo) -> str:
+def guess_title(shared_state, page_title, release_info: ReleaseInfo) -> str:
     # remove labels
-    clean_title = raw_base_title.rsplit('(', 1)[0].strip()
+    clean_title = page_title.rsplit('(', 1)[0].strip()
     # Remove season/staffel info
     pattern = r'(?i)\b(?:Season|Staffel)\s*\.?\s*\d+\b|\bR\d+\b'
     clean_title = re.sub(pattern, '', clean_title)
@@ -553,13 +347,16 @@ def guess_title(shared_state, raw_base_title, release_info: ReleaseInfo) -> str:
     a, su = release_info.audio_langs, release_info.subtitle_langs
     if len(a) > 2 and 'German' in a:
         prefix = 'German.ML'
-    elif 'German' in a and 'Japanese' in a:
+    elif len(a) == 2 and 'German' in a:
         prefix = 'German.DL'
-    elif 'German' in a and len(a) == 1:
+    elif len(a) == 1 and 'German' in a:
         prefix = 'German'
     elif a and 'German' in su:
         prefix = f"{a[0]}.Subbed"
     if prefix: parts.append(prefix)
+
+    if release_info.audio:
+        parts.append(release_info.audio)
 
     parts.extend([release_info.resolution, release_info.source, release_info.video])
     title = '.'.join(parts)

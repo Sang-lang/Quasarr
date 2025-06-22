@@ -9,10 +9,9 @@ import requests
 from bottle import Bottle, request
 
 import quasarr
-import quasarr.downloads.sources.dd
-from quasarr.downloads.sources import al
-from quasarr.downloads.sources import dd
-from quasarr.downloads.sources import nx
+import quasarr.providers.sessions.al
+import quasarr.providers.sessions.dd
+import quasarr.providers.sessions.nx
 from quasarr.providers.html_templates import render_button, render_form, render_success, render_fail
 from quasarr.providers.log import info
 from quasarr.providers.shared_state import extract_valid_hostname
@@ -157,15 +156,15 @@ def hostname_credentials_config(shared_state, shorthand, domain):
             config.save("password", password)
 
             if sh.lower() == "al":
-                if al.create_and_persist_session(shared_state):
+                if quasarr.providers.sessions.al.create_and_persist_session(shared_state):
                     quasarr.providers.web_server.temp_server_success = True
                     return render_success(f"{sh} credentials set successfully", 5)
             if sh.lower() == "dd":
-                if dd.create_and_persist_session(shared_state):
+                if quasarr.providers.sessions.dd.create_and_persist_session(shared_state):
                     quasarr.providers.web_server.temp_server_success = True
                     return render_success(f"{sh} credentials set successfully", 5)
             if sh.lower() == "nx":
-                if nx.create_and_persist_session(shared_state):
+                if quasarr.providers.sessions.nx.create_and_persist_session(shared_state):
                     quasarr.providers.web_server.temp_server_success = True
                     return render_success(f"{sh} credentials set successfully", 5)
 

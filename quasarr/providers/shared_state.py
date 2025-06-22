@@ -459,6 +459,8 @@ def sanitize_string(s):
     # Remove dots / pluses
     s = s.replace('.', ' ')
     s = s.replace('+', ' ')
+    s = s.replace('_', ' ')
+    s = s.replace('-', ' ')
 
     # Umlauts
     s = re.sub(r'ä', 'ae', s)

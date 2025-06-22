@@ -47,7 +47,7 @@ def download(shared_state, request_from, title, url, mirror, size_mb, password, 
         password = payload.get("password", "")
         if links:
             info(f"Decrypted {len(links)} download links for {title}")
-            send_discord_message(shared_state, title=title, case="unprotected", imdb_id=imdb_id)
+            send_discord_message(shared_state, title=title, case="unprotected", imdb_id=imdb_id, source=url)
             added = shared_state.download_package(links, title, password, package_id)
             if not added:
                 fail(title, package_id, shared_state,
@@ -62,11 +62,11 @@ def download(shared_state, request_from, title, url, mirror, size_mb, password, 
         links = get_dd_download_links(shared_state, mirror, title)
         if links:
             info(f"Decrypted {len(links)} download links for {title}")
-            send_discord_message(shared_state, title=title, case="unprotected", imdb_id=imdb_id)
+            send_discord_message(shared_state, title=title, case="unprotected", imdb_id=imdb_id, source=url)
             added = shared_state.download_package(links, title, password, package_id)
             if not added:
                 fail(title, package_id, shared_state,
-                     reason=f'Failed to add {len(links)} links for "{title}" to linkgrabber')
+                     reason=f'Failed to add {len(links)} links for "{title}" to linkgrabber', source=url)
                 success = False
         else:
             fail(title, package_id, shared_state,
@@ -77,7 +77,7 @@ def download(shared_state, request_from, title, url, mirror, size_mb, password, 
         links = get_dt_download_links(shared_state, url, mirror, title)
         if links:
             info(f"Decrypted {len(links)} download links for {title}")
-            send_discord_message(shared_state, title=title, case="unprotected", imdb_id=imdb_id)
+            send_discord_message(shared_state, title=title, case="unprotected", imdb_id=imdb_id, source=url)
             added = shared_state.download_package(links, title, password, package_id)
             if not added:
                 fail(title, package_id, shared_state,
@@ -92,14 +92,14 @@ def download(shared_state, request_from, title, url, mirror, size_mb, password, 
     elif dw and dw.lower() in url.lower():
         links = get_dw_download_links(shared_state, url, mirror, title)
         info(f'CAPTCHA-Solution required for "{title}" at: "{shared_state.values['external_address']}/captcha"')
-        send_discord_message(shared_state, title=title, case="captcha", imdb_id=imdb_id)
+        send_discord_message(shared_state, title=title, case="captcha", imdb_id=imdb_id, source=url)
         blob = json.dumps({"title": title, "links": links, "size_mb": size_mb, "password": password})
         shared_state.values["database"]("protected").update_store(package_id, blob)
 
     elif mb and mb.lower() in url.lower():
         links = get_mb_download_links(shared_state, url, mirror, title)
         info(f'CAPTCHA-Solution required for "{title}" at: "{shared_state.values['external_address']}/captcha"')
-        send_discord_message(shared_state, title=title, case="captcha", imdb_id=imdb_id)
+        send_discord_message(shared_state, title=title, case="captcha", imdb_id=imdb_id, source=url)
         blob = json.dumps({"title": title, "links": links, "size_mb": size_mb, "password": password})
         shared_state.values["database"]("protected").update_store(package_id, blob)
 
@@ -107,7 +107,7 @@ def download(shared_state, request_from, title, url, mirror, size_mb, password, 
         links = get_nx_download_links(shared_state, url, title)
         if links:
             info(f"Decrypted {len(links)} download links for {title}")
-            send_discord_message(shared_state, title=title, case="unprotected", imdb_id=imdb_id)
+            send_discord_message(shared_state, title=title, case="unprotected", imdb_id=imdb_id, source=url)
             added = shared_state.download_package(links, title, password, package_id)
             if not added:
                 fail(title, package_id, shared_state,
@@ -129,7 +129,7 @@ def download(shared_state, request_from, title, url, mirror, size_mb, password, 
 
         if url:
             info(f'CAPTCHA-Solution required for "{title}" at: "{shared_state.values['external_address']}/captcha"')
-            send_discord_message(shared_state, title=title, case="captcha", imdb_id=imdb_id)
+            send_discord_message(shared_state, title=title, case="captcha", imdb_id=imdb_id, source=url)
             blob = json.dumps(
                 {"title": title, "links": [[url, "filecrypt"]], "size_mb": size_mb, "password": password,
                  "mirror": mirror})
@@ -146,7 +146,7 @@ def download(shared_state, request_from, title, url, mirror, size_mb, password, 
             imdb_id = data.get("imdb_id")
         if links:
             info(f"Decrypted {len(links)} download links for {title}")
-            send_discord_message(shared_state, title=title, case="unprotected", imdb_id=imdb_id)
+            send_discord_message(shared_state, title=title, case="unprotected", imdb_id=imdb_id, source=url)
             added = shared_state.download_package(links, title, password, package_id)
             if not added:
                 fail(title, package_id, shared_state,
@@ -164,7 +164,7 @@ def download(shared_state, request_from, title, url, mirror, size_mb, password, 
             imdb_id = data.get("imdb_id")
         if links:
             info(f'CAPTCHA-Solution required for "{title}" at: "{shared_state.values['external_address']}/captcha"')
-            send_discord_message(shared_state, title=title, case="captcha", imdb_id=imdb_id)
+            send_discord_message(shared_state, title=title, case="captcha", imdb_id=imdb_id, source=url)
             blob = json.dumps({"title": title, "links": links, "size_mb": size_mb, "password": password})
             shared_state.values["database"]("protected").update_store(package_id, blob)
         else:
@@ -174,7 +174,7 @@ def download(shared_state, request_from, title, url, mirror, size_mb, password, 
 
     elif "filecrypt".lower() in url.lower():
         info(f'CAPTCHA-Solution required for "{title}" at: "{shared_state.values['external_address']}/captcha"')
-        send_discord_message(shared_state, title=title, case="captcha", imdb_id=imdb_id)
+        send_discord_message(shared_state, title=title, case="captcha", imdb_id=imdb_id, source=url)
         blob = json.dumps(
             {"title": title, "links": [[url, "filecrypt"]], "size_mb": size_mb, "password": password, "mirror": mirror})
         shared_state.values["database"]("protected").update_store(package_id, blob)
