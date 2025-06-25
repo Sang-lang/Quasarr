@@ -145,19 +145,20 @@ def setup_arr_routes(app):
                         return {
                             "queue": {
                                 "paused": False,
-                                "slots": packages["queue"]
+                                "slots": packages.get("queue", [])
                             }
                         }
                     elif mode == "history":
                         return {
                             "history": {
                                 "paused": False,
-                                "slots": packages["history"]
+                                "slots": packages.get("history", [])
                             }
                         }
             except Exception as e:
                 info(f"Error loading packages: {e}")
                 info(traceback.format_exc())
+            info(f"[ERROR] Unknown download client request: {dict(request.query)}")
             return {
                 "status": False
             }
@@ -245,6 +246,15 @@ def setup_arr_routes(app):
             except Exception as e:
                 info(f"Error loading search results: {e}")
                 info(traceback.format_exc())
+            info(f"[ERROR] Unknown indexer request: {dict(request.query)}")
+            return '''<?xml version="1.0" encoding="UTF-8"?>
+                        <rss>
+                            <channel>
+                                <title>Quasarr Indexer</title>
+                                <description>Quasarr Indexer API</description>
+                                <link>https://quasarr.indexer/</link>
+                            </channel>
+                        </rss>'''
 
-        info(f"Unknown request: {dict(request.query)}")
+        info(f"[ERROR] Unknown general request: {dict(request.query)}")
         return {"error": True}

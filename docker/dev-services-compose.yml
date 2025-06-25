@@ -74,5 +74,5 @@ services:
     environment:
       - TZ=Europe/Berlin
       - WATCHTOWER_CLEANUP=true
-      - WATCHTOWER_POLL_INTERVAL=3600
+      - WATCHTOWER_POLL_INTERVAL=600
     restart: unless-stopped
