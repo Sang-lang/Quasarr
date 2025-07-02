@@ -4,6 +4,7 @@
 
 import json
 
+from quasarr.downloads.linkcrypters.hide import decrypt_links_if_hide
 from quasarr.downloads.sources.al import get_al_download_links
 from quasarr.downloads.sources.dd import get_dd_download_links
 from quasarr.downloads.sources.dt import get_dt_download_links
@@ -163,10 +164,27 @@ def download(shared_state, request_from, title, url, mirror, size_mb, password, 
         if not imdb_id:
             imdb_id = data.get("imdb_id")
         if links:
-            info(f'CAPTCHA-Solution required for "{title}" at: "{shared_state.values['external_address']}/captcha"')
-            send_discord_message(shared_state, title=title, case="captcha", imdb_id=imdb_id, source=url)
-            blob = json.dumps({"title": title, "links": links, "size_mb": size_mb, "password": password})
-            shared_state.values["database"]("protected").update_store(package_id, blob)
+            decrypted_links = decrypt_links_if_hide(shared_state, links)
+            if decrypted_links and decrypted_links.get("status") != "none":
+                status = decrypted_links.get("status", "error")
+                links = decrypted_links.get("results", [])
+                if status == "success":
+                    info(f"Decrypted {len(links)} download links for {title}")
+                    send_discord_message(shared_state, title=title, case="unprotected", imdb_id=imdb_id, source=url)
+                    added = shared_state.download_package(links, title, password, package_id)
+                    if not added:
+                        fail(title, package_id, shared_state,
+                             reason=f'Failed to add {len(links)} links for "{title}" to linkgrabber')
+                        success = False
+                else:
+                    fail(title, package_id, shared_state,
+                         reason=f'Error decrypting hide.cx links for "{title}" on WD - "{url}"')
+                    success = False
+            else:
+                info(f'CAPTCHA-Solution required for "{title}" at: "{shared_state.values['external_address']}/captcha"')
+                send_discord_message(shared_state, title=title, case="captcha", imdb_id=imdb_id, source=url)
+                blob = json.dumps({"title": title, "links": links, "size_mb": size_mb, "password": password})
+                shared_state.values["database"]("protected").update_store(package_id, blob)
         else:
             fail(title, package_id, shared_state,
                  reason=f'Offline / no links found for "{title}" on WD - "{url}"')
