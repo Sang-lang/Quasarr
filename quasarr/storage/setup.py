@@ -80,6 +80,12 @@ def hostnames_config(shared_state):
             [hostname_fields.format(id=label.lower(), label=label) for label in shared_state.values["sites"]])
 
         hostname_form_html = f'''
+        <p>
+          If you're having trouble setting this up, take a closer look at 
+          <a href="https://github.com/rix1337/Quasarr?tab=readme-ov-file#instructions" target="_blank" rel="noopener noreferrer">
+            step one of the instructions.
+          </a>
+        </p>
         <form action="/api/hostnames" method="post">
             {hostname_form_content}
             {render_button("Save", "primary", {"type": "submit"})}
@@ -93,27 +99,26 @@ def hostnames_config(shared_state):
         hostnames = Config('Hostnames')
 
         hostname_set = False
+        message = "No valid hostname provided!"
 
         for key in shared_state.values["sites"]:
             shorthand = key.lower()
             hostname = request.forms.get(shorthand)
-            try:
-                if hostname:
-                    hostname = extract_valid_hostname(hostname, shorthand)
-            except Exception as e:
-                info(f"Error extracting domain from {hostname}: {e}")
-                continue
+            if shorthand and hostname:
+                domain_check = extract_valid_hostname(hostname, shorthand)
+                domain = domain_check.get('domain', None)
+                message = domain_check.get('message', "Error checking the hostname you provided!")
 
-            if hostname:
-                hostnames.save(key, hostname)
-                hostname_set = True
+                if domain:
+                    hostnames.save(key, domain)
+                    hostname_set = True
 
         if hostname_set:
+            message = "At least one valid hostname set!"
             quasarr.providers.web_server.temp_server_success = True
-            return render_success("At least one valid hostname set",
-                                  5)
+            return render_success(message, 5)
         else:
-            return render_fail("No valid hostname provided!")
+            return render_fail(message)
 
     info(f'Hostnames not set. Starting web server for config at: "{shared_state.values['internal_address']}".')
     info("Please set at least one valid hostname there!")
