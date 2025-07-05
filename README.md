@@ -22,9 +22,8 @@ Quasarr will confidently handle the rest.
 
 * Set up at least one hostname for Quasarr to use
     * Chose your own or use the `HOSTNAMES` variable to provide a list of hostnames.
-    * This project will not condone nor provide you with hostnames. Search Google, Pastebin, etc. for suggestions.
-    * Always redact hostnames when creating issues in this repo.
-    * Quasarr will become available once at least one suitable hostname is set.
+    * This project will not condone nor provide you with hostnames.
+    * Check sites like Pastebin.com for user-submitted suggestions.
 * Provide your [My-JDownloader-Credentials](https://my.jdownloader.org)
     * Consider setting up a fresh JDownloader before you begin.
     * JDownloader must be running and available to Quasarr.

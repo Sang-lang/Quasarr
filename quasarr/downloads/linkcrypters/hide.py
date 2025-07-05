@@ -112,5 +112,4 @@ def decrypt_links_if_hide(shared_state: Any, items: List[List[str]]) -> Dict[str
         info(f"Could not decrypt any links from hide.cx URLs.")
         return {"status": "error", "results": []}
 
-    info(f"Found a total of {len(decrypted_links)} decrypted links.")
     return {"status": "success", "results": decrypted_links}

@@ -23,6 +23,21 @@ lock = None
 SEASON_EP_REGEX = re.compile(r"(?i)(?:S\d{1,3}(?:E\d{1,3}(?:-\d{1,3})?)?|S\d{1,3}-\d{1,3})")
 # regex to filter out season/episode tags for movies
 MOVIE_REGEX = re.compile(r"^(?!.*(?:S\d{1,3}(?:E\d{1,3}(?:-\d{1,3})?)?|S\d{1,3}-\d{1,3})).*$", re.IGNORECASE)
+# List of known file hosters that should not be used as search/feed sites
+SHARE_HOSTERS = {
+    "rapidgator",
+    "ddownload",
+    "keep2share",
+    "1fichier",
+    "katfile",
+    "filer",
+    "turbobit",
+    "nitroflare",
+    "filefactory",
+    "uptobox",
+    "mediafire",
+    "mega",
+}
 
 
 def set_state(manager_dict, manager_lock):
@@ -63,26 +78,37 @@ def generate_api_key():
 
 
 def extract_valid_hostname(url, shorthand):
-    # Check if both characters from the shorthand appear in the url
     try:
         if '://' not in url:
             url = 'http://' + url
         result = parse.urlparse(url)
         domain = result.netloc
+        parts = domain.split('.')
 
-        if not "." in domain:
-            print(f'Invalid domain "{domain}": No "." found')
-            return None
+        if domain.startswith(".") or domain.endswith(".") or "." not in domain[1:-1]:
+            message = f'"{domain}" must contain a "." somewhere in the middle – you need to provide a full domain name!'
+            domain = None
 
-        if all(char in domain for char in shorthand):
-            print(f'"{domain}" matches both characters from "{shorthand}". Continuing...')
-            return domain
+        elif any(hoster in parts for hoster in SHARE_HOSTERS):
+            offending = next(host for host in parts if host in SHARE_HOSTERS)
+            message = (
+                f'Error: “{domain}” is a file‑hosting domain and cannot be used here directly! '
+                f'Instead please provide a valid hostname that serves direct file links (including "{offending}").'
+            )
+            domain = None
+
+        elif all(char in domain for char in shorthand):
+            message = f'"{domain}" contains both characters from shorthand "{shorthand}". Continuing...'
+
         else:
-            print(f'Invalid domain "{domain}": Does not contain both characters from shorthand "{shorthand}"')
-            return None
+            message = f'"{domain}" does not contain both characters from shorthand "{shorthand}".'
+            domain = None
     except Exception as e:
-        print(f"Error parsing URL {url}: {e}")
-        return None
+        message = f"Error: {e}. Please provide a valid URL."
+        domain = None
+
+    print(message)
+    return {"domain": domain, "message": message}
 
 
 def connect_to_jd(jd, user, password, device_name):

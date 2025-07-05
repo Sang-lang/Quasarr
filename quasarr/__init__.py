@@ -125,7 +125,8 @@ def run():
                     if results:
                         hostnames = Config('Hostnames')
                         for shorthand, hostname in results.items():
-                            valid_domain = shared_state.extract_valid_hostname(hostname, shorthand)
+                            domain_check = shared_state.extract_valid_hostname(hostname, shorthand)
+                            valid_domain = domain_check.get('domain', None)
                             if valid_domain:
                                 hostnames.save(shorthand, hostname)
                                 extracted_hostnames += 1
