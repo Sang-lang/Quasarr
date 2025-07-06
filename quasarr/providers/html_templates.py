@@ -2,7 +2,9 @@
 # Quasarr
 # Project by https://github.com/rix1337
 
+import quasarr.providers.html_images as images
 from quasarr.providers.version import get_version
+
 
 def render_centered_html(inner_content):
     head = '''
@@ -10,7 +12,7 @@ def render_centered_html(inner_content):
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>Quasarr</title>
-        <link rel="icon" href="https://raw.githubusercontent.com/rix1337/Quasarr/main/Quasarr.png">
+        <link rel="icon" href="''' + images.logo + '''" type="image/png">
         <style>
             /* Theme variables */
             :root {
@@ -195,7 +197,7 @@ def render_button(text, button_type="primary", attributes=None):
 
 def render_form(header, form="", script=""):
     content = f'''
-    <h1><img src="https://raw.githubusercontent.com/rix1337/Quasarr/main/Quasarr.png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
+    <h1><img src="{images.logo}" type="image/png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
     <h2>{header}</h2>
     {form}
     {script}
@@ -203,7 +205,7 @@ def render_form(header, form="", script=""):
     return render_centered_html(content)
 
 
-def render_success(message, timeout=10):
+def render_success(message, timeout=10, optional_text=""):
     button_html = render_button(f"Wait time... {timeout}", "secondary", {"id": "nextButton", "disabled": "true"})
     script = f'''
         <script>
@@ -222,8 +224,9 @@ def render_success(message, timeout=10):
             }}, 1000);
         </script>
     '''
-    content = f'''<h1><img src="https://raw.githubusercontent.com/rix1337/Quasarr/main/Quasarr.png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
+    content = f'''<h1><img src="{images.logo}" type="image/png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
     <h2>{message}</h2>
+    {optional_text}
     {button_html}
     {script}
     '''
@@ -232,7 +235,7 @@ def render_success(message, timeout=10):
 
 def render_fail(message):
     button_html = render_button("Back", "secondary", {"onclick": "window.location.href='/'"})
-    return render_centered_html(f"""<h1><img src="https://raw.githubusercontent.com/rix1337/Quasarr/main/Quasarr.png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
+    return render_centered_html(f"""<h1><img src="{images.logo}" type="image/png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
         <h2>{message}</h2>
         {button_html}
     """)

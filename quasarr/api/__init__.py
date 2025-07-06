@@ -4,8 +4,10 @@
 
 from bottle import Bottle
 
+import quasarr.providers.html_images as images
 from quasarr.api.arr import setup_arr_routes
 from quasarr.api.captcha import setup_captcha_routes
+from quasarr.api.config import setup_config
 from quasarr.api.sponsors_helper import setup_sponsors_helper_routes
 from quasarr.providers import shared_state
 from quasarr.providers.html_templates import render_button, render_centered_html
@@ -20,6 +22,7 @@ def get_api(shared_state_dict, shared_state_lock):
 
     setup_arr_routes(app)
     setup_captcha_routes(app)
+    setup_config(app, shared_state)
     setup_sponsors_helper_routes(app)
 
     @app.get('/')
@@ -49,7 +52,7 @@ def get_api(shared_state_dict, shared_state_lock):
             """
 
         info = f"""
-        <h1><img src="https://raw.githubusercontent.com/rix1337/Quasarr/main/Quasarr.png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
+        <h1><img src="{images.logo}" type="image/png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
         {captcha_hint}
         <h2>Setup Instructions</h2>
         <p>
@@ -107,6 +110,11 @@ def get_api(shared_state_dict, shared_state_lock):
             setTimeout(() => {{ copyBtn.innerText = 'Copy'; }}, 2000);
           }};
         </script>
+        
+        <h3>Hostnames</h3>
+        <div class="api-key-wrapper">
+          <button class="btn-primary small" onclick="location.href='/hostnames/'">Update Hostnames</button>
+        </div>
         """
         return render_centered_html(info)
 
