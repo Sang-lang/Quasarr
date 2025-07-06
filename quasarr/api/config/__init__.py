@@ -20,4 +20,4 @@ def setup_config(app, shared_state):
 
     @app.post("/api/hostnames")
     def hostnames_api():
-        return save_hostnames(shared_state, timeout=1)
+        return save_hostnames(shared_state, timeout=1, first_run=False)
