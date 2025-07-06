@@ -134,7 +134,7 @@ def hostname_form_html(shared_state, message):
     )
 
 
-def save_hostnames(shared_state, timeout=5):
+def save_hostnames(shared_state, timeout=5, first_run=True):
     hostnames = Config('Hostnames')
 
     # Collect submitted hostnames, validate, and track errors
@@ -165,35 +165,41 @@ def save_hostnames(shared_state, timeout=5):
         return render_fail(fail_msg)
 
     # Save: valid ones, explicit empty for those omitted cleanly, leave untouched if error
+    changed_sites = []
     for site_key in shared_state.values['sites']:
         shorthand = site_key.lower()
         raw_value = request.forms.get(shorthand)
+        # determine if change applies
         if site_key in valid_domains:
-            hostnames.save(site_key, valid_domains[site_key])
+            new_val = valid_domains[site_key]
+            old_val = hostnames.get(shorthand) or ''
+            if old_val != new_val:
+                hostnames.save(shorthand, new_val)
+                changed_sites.append(shorthand)
         elif raw_value is None:
             # no submission: leave untouched
             continue
         elif raw_value.strip() == '':
-            # empty submission: clear out
-            hostnames.save(site_key, '')
-        elif site_key in errors:
-            # invalid submission: leave untouched
-            continue
-        else:
-            # fallback (shouldn't happen): leave untouched
-            continue
+            old_val = hostnames.get(shorthand) or ''
+            if old_val != '':
+                hostnames.save(shorthand, '')
 
     quasarr.providers.web_server.temp_server_success = True
 
     # Build success message, include any per-site errors
     success_msg = 'At least one valid hostname set!'
     if errors:
-        error_msg = "<br>".join(f"{site}: {msg}" for site, msg in errors.items()) + "<br>"
+        optional_text = "<br>".join(f"{site}: {msg}" for site, msg in errors.items()) + "<br>"
     else:
-        error_msg = "All provided hostnames are valid.<br>"
+        optional_text = "All provided hostnames are valid.<br>"
 
-    return render_success(success_msg, timeout, optional_text=error_msg)
+    if not first_run:
+        # Append restart notice for specific sites that actually changed
+        for site in changed_sites:
+            if site.lower() in {'al', 'dd', 'nx'}:
+                optional_text += f"{site.upper()}: You must restart Quasarr and follow additional steps to start using this site.<br>"
 
+    return render_success(success_msg, timeout, optional_text=optional_text)
 
 
 def hostnames_config(shared_state):
