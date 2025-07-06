@@ -21,8 +21,8 @@ Quasarr will confidently handle the rest.
 # Instructions
 
 * Tell Quasarr which sites to search for releases. It requires at least one valid source to start up.
-  * By default, Quasarr does know which sites to scrape for download links.
-  * The setup will guide you through the process of providing valid hostnames.
+  * By default, Quasarr does not know which sites to scrape for download links.
+  * The setup will guide you through the process of providing valid hostnames for Quasarr to scrape.
   * Do not ask for help here if you do not know which hostnames to use. Picking them is solely your responsibility.
   * You may check sites like [Pastebin](https://pastebin.com/search?q=hostnames+quasarr) for user-submitted suggestions.
 * Provide your [My-JDownloader-Credentials](https://my.jdownloader.org)
@@ -100,8 +100,6 @@ Use this only in case you can't run the docker image.
 Complexity is the killer of small projects like this one. It must be fought at all cost!
 
 We will not waste precious time on features that will slow future development cycles down.
-It is by choice, that you will not find settings or filtering options in Quasarr.
-
 Most feature requests can be satisfied by:
 
 - Existing settings in Radarr/Sonarr
