@@ -205,7 +205,7 @@ def render_form(header, form="", script=""):
     return render_centered_html(content)
 
 
-def render_success(message, timeout=10):
+def render_success(message, timeout=10, optional_text=""):
     button_html = render_button(f"Wait time... {timeout}", "secondary", {"id": "nextButton", "disabled": "true"})
     script = f'''
         <script>
@@ -226,6 +226,7 @@ def render_success(message, timeout=10):
     '''
     content = f'''<h1><img src="{images.logo}" type="image/png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
     <h2>{message}</h2>
+    {optional_text}
     {button_html}
     {script}
     '''

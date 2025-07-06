@@ -108,8 +108,6 @@ Most feature requests can be satisfied by:
 - Existing settings in JDownloader
 - Existing tools from the *arr ecosystem that integrate directly with Radarr/Sonarr
 
-If you want to edit the hostname selection after the initial setup, you can do so by editing or deleting `Quasarr.ini`.
-
 # Roadmap
 
 - Assume there are zero known

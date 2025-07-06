@@ -86,13 +86,13 @@ def extract_valid_hostname(url, shorthand):
         parts = domain.split('.')
 
         if domain.startswith(".") or domain.endswith(".") or "." not in domain[1:-1]:
-            message = f'"{domain}" must contain a "." somewhere in the middle – you need to provide a full domain name!'
+            message = f'Error: "{domain}" must contain a "." somewhere in the middle – you need to provide a full domain name!'
             domain = None
 
         elif any(hoster in parts for hoster in SHARE_HOSTERS):
             offending = next(host for host in parts if host in SHARE_HOSTERS)
             message = (
-                f'Error: “{domain}” is a file‑hosting domain and cannot be used here directly! '
+                f'Error: "{domain}" is a file‑hosting domain and cannot be used here directly! '
                 f'Instead please provide a valid hostname that serves direct file links (including "{offending}").'
             )
             domain = None
@@ -101,7 +101,7 @@ def extract_valid_hostname(url, shorthand):
             message = f'"{domain}" contains both characters from shorthand "{shorthand}". Continuing...'
 
         else:
-            message = f'"{domain}" does not contain both characters from shorthand "{shorthand}".'
+            message = f'Error: "{domain}" does not contain both characters from shorthand "{shorthand}".'
             domain = None
     except Exception as e:
         message = f"Error: {e}. Please provide a valid URL."

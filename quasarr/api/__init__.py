@@ -113,7 +113,7 @@ def get_api(shared_state_dict, shared_state_lock):
         
         <h3>Hostnames</h3>
         <div class="api-key-wrapper">
-          <button id="hostnamesConfig" class="btn-primary small" onclick="location.href='/hostnames/'">Config</button>
+          <button class="btn-primary small" onclick="location.href='/hostnames/'">Update Hostnames</button>
         </div>
         """
         return render_centered_html(info)

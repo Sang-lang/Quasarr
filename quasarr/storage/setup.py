@@ -70,59 +70,130 @@ def path_config(shared_state):
 def hostname_form_html(shared_state, message):
     hostname_fields = '''
     <label for="{id}" style="display:inline-flex; align-items:center; gap:4px;">{label}{img_html}</label>
-    <input type="text" id="{id}" name="{id}" placeholder="example.com" autocorrect="off" autocomplete="off"><br>
+    <input type="text" id="{id}" name="{id}" placeholder="example.com" autocorrect="off" autocomplete="off" value="{value}"><br>
     '''
 
     field_html = []
+    hostnames = Config('Hostnames')  # Load once outside the loop
     for label in shared_state.values["sites"]:
         field_id = label.lower()
         img_html = ''
-        # Try to get a base64 image string for this hostname
         try:
             img_data = getattr(images, field_id)
             if img_data:
                 img_html = f' <img src="{img_data}" width="16" height="16" style="filter: blur(2px);" alt="{label} icon">'
         except AttributeError:
-            # No image available for this hostname
             pass
 
-        field_html.append(hostname_fields.format(id=field_id, label=label, img_html=img_html))
+        # Get the current value (if any and non-empty)
+        current_value = hostnames.get(field_id)
+        if not current_value:
+            current_value = ''  # Ensure it's empty if None or ""
+
+        field_html.append(hostname_fields.format(
+            id=field_id,
+            label=label,
+            img_html=img_html,
+            value=current_value
+        ))
 
     hostname_form_content = "".join(field_html)
+    button_html = render_button("Save", "primary", {"type": "submit"})
 
-    return f'''
-    {message}
-    <form action="/api/hostnames" method="post">
-        {hostname_form_content}
-        {render_button("Save", "primary", {"type": "submit"})}
-    </form>
-    '''
+    template = """
+<div id="message" style="margin-bottom:0.5em;">{message}</div>
+<div id="error-msg" style="color:red; margin-bottom:1em;"></div>
+
+<form action="/api/hostnames" method="post" onsubmit="return validateHostnames(this)">
+    {hostname_form_content}
+    {button}
+</form>
+
+<script>
+  function validateHostnames(form) {{
+    var errorDiv = document.getElementById('error-msg');
+    errorDiv.textContent = '';
+
+    var inputs = form.querySelectorAll('input[type="text"]');
+    for (var i = 0; i < inputs.length; i++) {{
+      if (inputs[i].value.trim() !== '') {{
+        return true;
+      }}
+    }}
+
+    errorDiv.textContent = 'Please fill in at least one hostname!';
+    inputs[0].focus();
+    return false;
+  }}
+</script>
+"""
+    return template.format(
+        message=message,
+        hostname_form_content=hostname_form_content,
+        button=button_html
+    )
 
 
-def save_hostnames(shared_state):
+def save_hostnames(shared_state, timeout=5):
     hostnames = Config('Hostnames')
 
-    hostname_set = False
-    message = "No valid hostname provided!"
+    # Collect submitted hostnames, validate, and track errors
+    valid_domains = {}
+    errors = {}
 
-    for key in shared_state.values["sites"]:
-        shorthand = key.lower()
-        hostname = request.forms.get(shorthand)
-        if shorthand and hostname:
-            domain_check = extract_valid_hostname(hostname, shorthand)
-            domain = domain_check.get('domain', None)
-            message = domain_check.get('message', "Error checking the hostname you provided!")
+    for site_key in shared_state.values['sites']:
+        shorthand = site_key.lower()
+        raw_value = request.forms.get(shorthand)
+        # treat missing or empty string as intentional clear, no validation
+        if raw_value is None or raw_value.strip() == '':
+            continue
 
-            if domain:
-                hostnames.save(key, domain)
-                hostname_set = True
+        # non-empty submission: must validate
+        result = extract_valid_hostname(raw_value, shorthand)
+        domain = result.get('domain')
+        message = result.get('message', 'Error checking the hostname you provided!')
+        if domain:
+            valid_domains[site_key] = domain
+        else:
+            errors[site_key] = message
 
-    if hostname_set:
-        message = "At least one valid hostname set!"
-        quasarr.providers.web_server.temp_server_success = True
-        return render_success(message, 5)
+    # Filter out any accidental empty domains and require at least one valid hostname overall
+    valid_domains = {k: d for k, d in valid_domains.items() if d}
+    if not valid_domains:
+        # report last or generic message
+        fail_msg = next(iter(errors.values()), 'No valid hostname provided!')
+        return render_fail(fail_msg)
+
+    # Save: valid ones, explicit empty for those omitted cleanly, leave untouched if error
+    for site_key in shared_state.values['sites']:
+        shorthand = site_key.lower()
+        raw_value = request.forms.get(shorthand)
+        if site_key in valid_domains:
+            hostnames.save(site_key, valid_domains[site_key])
+        elif raw_value is None:
+            # no submission: leave untouched
+            continue
+        elif raw_value.strip() == '':
+            # empty submission: clear out
+            hostnames.save(site_key, '')
+        elif site_key in errors:
+            # invalid submission: leave untouched
+            continue
+        else:
+            # fallback (shouldn't happen): leave untouched
+            continue
+
+    quasarr.providers.web_server.temp_server_success = True
+
+    # Build success message, include any per-site errors
+    success_msg = 'At least one valid hostname set!'
+    if errors:
+        error_msg = "<br>".join(f"{site}: {msg}" for site, msg in errors.items()) + "<br>"
     else:
-        return render_fail(message)
+        error_msg = "All provided hostnames are valid.<br>"
+
+    return render_success(success_msg, timeout, optional_text=error_msg)
+
 
 
 def hostnames_config(shared_state):
@@ -268,9 +339,9 @@ def jdownloader_config(shared_state):
         verify_form_html = f'''
         <span>If required register account at: <a href="https://my.jdownloader.org/login.html#register">
         my.jdownloader.org</a>!</span><br>
-        
+
         <p><strong>JDownloader must be running and connected to My JDownloader!</strong></p><br>
-        
+
         <form id="verifyForm" action="/api/verify_jdownloader" method="post">
             <label for="user">E-Mail</label>
             <input type="text" id="user" name="user" placeholder="user@example.org" autocorrect="off"><br>
@@ -280,9 +351,9 @@ def jdownloader_config(shared_state):
                            "secondary",
                            {"id": "verifyButton", "type": "button", "onclick": "verifyCredentials()"})}
         </form>
-        
+
         <p>Some JDownloader settings will be enforced by Quasarr on startup.</p>
-        
+
         <form action="/api/store_jdownloader" method="post" id="deviceForm" style="display: none;">
             <input type="hidden" id="hiddenUser" name="user">
             <input type="hidden" id="hiddenPass" name="pass">
