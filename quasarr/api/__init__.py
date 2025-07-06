@@ -4,6 +4,7 @@
 
 from bottle import Bottle
 
+import quasarr.providers.html_images as images
 from quasarr.api.arr import setup_arr_routes
 from quasarr.api.captcha import setup_captcha_routes
 from quasarr.api.config import setup_config
@@ -51,7 +52,7 @@ def get_api(shared_state_dict, shared_state_lock):
             """
 
         info = f"""
-        <h1><img src="https://raw.githubusercontent.com/rix1337/Quasarr/main/Quasarr.png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
+        <h1><img src="{images.logo}" type="image/png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
         {captcha_hint}
         <h2>Setup Instructions</h2>
         <p>

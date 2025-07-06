@@ -8,6 +8,7 @@ import re
 import requests
 from bottle import request, response
 
+import quasarr.providers.html_images as images
 from quasarr.downloads.linkcrypters.filecrypt import get_filecrypt_links
 from quasarr.providers import shared_state
 from quasarr.providers.html_templates import render_button, render_centered_html
@@ -23,7 +24,7 @@ def setup_captcha_routes(app):
         except KeyError:
             device = None
         if not device:
-            return render_centered_html(f'''<h1><img src="https://raw.githubusercontent.com/rix1337/Quasarr/main/Quasarr.png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
+            return render_centered_html(f'''<h1><img src="{images.logo}" type="image/png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
             <p>JDownloader connection not established.</p>
             <p>
                 {render_button("Back", "secondary", {"onclick": "location.href='/'"})}
@@ -31,7 +32,7 @@ def setup_captcha_routes(app):
 
         protected = shared_state.get_db("protected").retrieve_all_titles()
         if not protected:
-            return render_centered_html(f'''<h1><img src="https://raw.githubusercontent.com/rix1337/Quasarr/main/Quasarr.png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
+            return render_centered_html(f'''<h1><img src="{images.logo}" type="image/png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
             <p>No protected packages found! CAPTCHA not needed.</p>
             <p>
                 {render_button("Confirm", "secondary", {"onclick": "location.href='/'"})}
@@ -110,7 +111,7 @@ def setup_captcha_routes(app):
                 }
                 ''' + captcha_js() + f'''</script>
                 <div>
-                    <h1><img src="https://raw.githubusercontent.com/rix1337/Quasarr/main/Quasarr.png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
+                    <h1><img src="{images.logo}" type="image/png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
                     <div id="captcha-key"></div>
                     {link_select}<br><br>
                     <input type="hidden" id="link-hidden" value="{links[0][0]}" />

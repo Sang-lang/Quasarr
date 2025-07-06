@@ -70,68 +70,33 @@ def path_config(shared_state):
 def hostname_form_html(shared_state, message):
     hostname_fields = '''
     <label for="{id}" style="display:inline-flex; align-items:center; gap:4px;">{label}{img_html}</label>
-    <input type="text" id="{id}" name="{id}" placeholder="example.com" autocorrect="off" autocomplete="off" value="{value}"><br>
+    <input type="text" id="{id}" name="{id}" placeholder="example.com" autocorrect="off" autocomplete="off"><br>
     '''
 
     field_html = []
-    hostnames = Config('Hostnames')  # Load once outside the loop
     for label in shared_state.values["sites"]:
         field_id = label.lower()
         img_html = ''
+        # Try to get a base64 image string for this hostname
         try:
             img_data = getattr(images, field_id)
             if img_data:
                 img_html = f' <img src="{img_data}" width="16" height="16" style="filter: blur(2px);" alt="{label} icon">'
         except AttributeError:
+            # No image available for this hostname
             pass
 
-        # Get the current value (if any and non-empty)
-        current_value = hostnames.get(field_id)
-        if not current_value:
-            current_value = ''  # Ensure it's empty if None or ""
-
-        field_html.append(hostname_fields.format(
-            id=field_id,
-            label=label,
-            img_html=img_html,
-            value=current_value
-        ))
+        field_html.append(hostname_fields.format(id=field_id, label=label, img_html=img_html))
 
     hostname_form_content = "".join(field_html)
-    button_html = render_button("Save", "primary", {"type": "submit"})
 
-    template = """
-<div id="message" style="margin-bottom:0.5em;">{message}</div>
-<div id="error-msg" style="color:red; margin-bottom:1em;"></div>
-
-<form action="/api/hostnames" method="post" onsubmit="return validateHostnames(this)">
-    {hostname_form_content}
-    {button}
-</form>
-
-<script>
-  function validateHostnames(form) {{
-    var errorDiv = document.getElementById('error-msg');
-    errorDiv.textContent = '';
-
-    var inputs = form.querySelectorAll('input[type="text"]');
-    for (var i = 0; i < inputs.length; i++) {{
-      if (inputs[i].value.trim() !== '') {{
-        return true;
-      }}
-    }}
-
-    errorDiv.textContent = 'Please fill in at least one hostname!';
-    inputs[0].focus();
-    return false;
-  }}
-</script>
-"""
-    return template.format(
-        message=message,
-        hostname_form_content=hostname_form_content,
-        button=button_html
-    )
+    return f'''
+    {message}
+    <form action="/api/hostnames" method="post">
+        {hostname_form_content}
+        {render_button("Save", "primary", {"type": "submit"})}
+    </form>
+    '''
 
 
 def save_hostnames(shared_state):
