@@ -9,6 +9,7 @@ import requests
 from bottle import Bottle, request
 
 import quasarr
+import quasarr.providers.html_images as images
 import quasarr.providers.sessions.al
 import quasarr.providers.sessions.dd
 import quasarr.providers.sessions.nx
@@ -66,59 +67,115 @@ def path_config(shared_state):
     return Server(app, listen='0.0.0.0', port=shared_state.values['port']).serve_temporarily()
 
 
+def hostname_form_html(shared_state, message):
+    hostname_fields = '''
+    <label for="{id}" style="display:inline-flex; align-items:center; gap:4px;">{label}{img_html}</label>
+    <input type="text" id="{id}" name="{id}" placeholder="example.com" autocorrect="off" autocomplete="off" value="{value}"><br>
+    '''
+
+    field_html = []
+    hostnames = Config('Hostnames')  # Load once outside the loop
+    for label in shared_state.values["sites"]:
+        field_id = label.lower()
+        img_html = ''
+        try:
+            img_data = getattr(images, field_id)
+            if img_data:
+                img_html = f' <img src="{img_data}" width="16" height="16" style="filter: blur(2px);" alt="{label} icon">'
+        except AttributeError:
+            pass
+
+        # Get the current value (if any and non-empty)
+        current_value = hostnames.get(field_id)
+        if not current_value:
+            current_value = ''  # Ensure it's empty if None or ""
+
+        field_html.append(hostname_fields.format(
+            id=field_id,
+            label=label,
+            img_html=img_html,
+            value=current_value
+        ))
+
+    hostname_form_content = "".join(field_html)
+    button_html = render_button("Save", "primary", {"type": "submit"})
+
+    template = """
+<div id="message" style="margin-bottom:0.5em;">{message}</div>
+<div id="error-msg" style="color:red; margin-bottom:1em;"></div>
+
+<form action="/api/hostnames" method="post" onsubmit="return validateHostnames(this)">
+    {hostname_form_content}
+    {button}
+</form>
+
+<script>
+  function validateHostnames(form) {{
+    var errorDiv = document.getElementById('error-msg');
+    errorDiv.textContent = '';
+
+    var inputs = form.querySelectorAll('input[type="text"]');
+    for (var i = 0; i < inputs.length; i++) {{
+      if (inputs[i].value.trim() !== '') {{
+        return true;
+      }}
+    }}
+
+    errorDiv.textContent = 'Please fill in at least one hostname!';
+    inputs[0].focus();
+    return false;
+  }}
+</script>
+"""
+    return template.format(
+        message=message,
+        hostname_form_content=hostname_form_content,
+        button=button_html
+    )
+
+
+def save_hostnames(shared_state):
+    hostnames = Config('Hostnames')
+
+    hostname_set = False
+    message = "No valid hostname provided!"
+
+    for key in shared_state.values["sites"]:
+        shorthand = key.lower()
+        hostname = request.forms.get(shorthand)
+        if shorthand and hostname:
+            domain_check = extract_valid_hostname(hostname, shorthand)
+            domain = domain_check.get('domain', None)
+            message = domain_check.get('message', "Error checking the hostname you provided!")
+
+            if domain:
+                hostnames.save(key, domain)
+                hostname_set = True
+
+    if hostname_set:
+        message = "At least one valid hostname set!"
+        quasarr.providers.web_server.temp_server_success = True
+        return render_success(message, 5)
+    else:
+        return render_fail(message)
+
+
 def hostnames_config(shared_state):
     app = Bottle()
 
     @app.get('/')
     def hostname_form():
-        hostname_fields = '''
-        <label for="{id}">{label}</label>
-        <input type="text" id="{id}" name="{id}" placeholder="example.com" autocorrect="off" autocomplete="off"><br>
-        '''
-
-        hostname_form_content = "".join(
-            [hostname_fields.format(id=label.lower(), label=label) for label in shared_state.values["sites"]])
-
-        hostname_form_html = f'''
-        <p>
+        message = """<p>
           If you're having trouble setting this up, take a closer look at 
           <a href="https://github.com/rix1337/Quasarr?tab=readme-ov-file#instructions" target="_blank" rel="noopener noreferrer">
-            step one of the instructions.
+            step one of these instructions.
           </a>
-        </p>
-        <form action="/api/hostnames" method="post">
-            {hostname_form_content}
-            {render_button("Save", "primary", {"type": "submit"})}
-        </form>
-        '''
-
-        return render_form("Set at least one valid hostname", hostname_form_html)
+        </p>"""
+        return render_form("Set at least one valid hostname", hostname_form_html(shared_state, message))
 
     @app.post("/api/hostnames")
     def set_hostnames():
-        hostnames = Config('Hostnames')
-
-        hostname_set = False
-        message = "No valid hostname provided!"
-
-        for key in shared_state.values["sites"]:
-            shorthand = key.lower()
-            hostname = request.forms.get(shorthand)
-            if shorthand and hostname:
-                domain_check = extract_valid_hostname(hostname, shorthand)
-                domain = domain_check.get('domain', None)
-                message = domain_check.get('message', "Error checking the hostname you provided!")
-
-                if domain:
-                    hostnames.save(key, domain)
-                    hostname_set = True
-
-        if hostname_set:
-            message = "At least one valid hostname set!"
-            quasarr.providers.web_server.temp_server_success = True
-            return render_success(message, 5)
-        else:
-            return render_fail(message)
+        return save_hostnames(shared_state)
 
     info(f'Hostnames not set. Starting web server for config at: "{shared_state.values['internal_address']}".')
     info("Please set at least one valid hostname there!")
