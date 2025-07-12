@@ -54,7 +54,6 @@ def extract_season_from_synonyms(soup):
     Returns the first season found as "Season N" in the Synonym(s) <td>, or None.
     Only scans the synonyms cell—no fallback to whole document.
     """
-
     syn_td = None
     for tr in soup.select('tr'):
         th = tr.find('th')
@@ -67,29 +66,73 @@ def extract_season_from_synonyms(soup):
 
     text = syn_td.get_text(" ", strip=True)
 
-    synonym_season_patters = [
-        re.compile(r'\b(?:Season|Staffel)\s*0?(\d+)\b', re.IGNORECASE),
-        re.compile(r'\b0?(\d+)(?:st|nd|rd|th)\s+Season\b', re.IGNORECASE),
-        re.compile(r'\b(\d+)\.\s*Staffel\b', re.IGNORECASE),
-        re.compile(r'\b([IVXLCDM]+)\b(?=\s*$)'),  # uppercase Roman at end
+    synonym_season_patterns = [
+        re.compile(r"\b(?:Season|Staffel)\s*0?(\d+)\b", re.IGNORECASE),
+        re.compile(r"\b0?(\d+)(?:st|nd|rd|th)\s+Season\b", re.IGNORECASE),
+        re.compile(r"\b(\d+)\.\s*Staffel\b", re.IGNORECASE),
+        re.compile(r"\bS0?(\d+)\b", re.IGNORECASE),  # S02, s2, etc.
+        re.compile(r"\b([IVXLCDM]+)\b(?=\s*$)"),  # uppercase Roman at end
     ]
 
-    # 2) Search for season‐patterns, return on first match
-    for pat in synonym_season_patters:
+    for pat in synonym_season_patterns:
         m = pat.search(text)
         if not m:
             continue
 
         tok = m.group(0)
         # Digit match → extract number
-        dm = re.search(r'(\d+)', tok)
+        dm = re.search(r"(\d+)", tok)
         if dm:
             return int(dm.group(1))
         # Uppercase Roman → convert & return
-        if tok.isupper() and re.fullmatch(r'[IVXLCDM]+', tok):
+        if tok.isupper() and re.fullmatch(r"[IVXLCDM]+", tok):
             return roman_to_int(tok)
 
-    # nothing found
+    return None
+
+
+def find_season_in_release_notes(soup):
+    """
+    Iterates through all <tr> rows with a "Release Notes" <th> (case-insensitive).
+    Returns the first season number found as an int, or None if not found.
+    """
+
+    patterns = [
+        re.compile(r"\b(?:Season|Staffel)\s*0?(\d+)\b", re.IGNORECASE),
+        re.compile(r"\b0?(\d+)(?:st|nd|rd|th)\s+Season\b", re.IGNORECASE),
+        re.compile(r"\b(\d+)\.\s*Staffel\b", re.IGNORECASE),
+        re.compile(r"\bS(?:eason)?0?(\d+)\b", re.IGNORECASE),
+        re.compile(r"\b([IVXLCDM]+)\b(?=\s*$)"),  # uppercase Roman at end
+    ]
+
+    for tr in soup.select('tr'):
+        th = tr.find('th')
+        if not th:
+            continue
+
+        header = th.get_text(strip=True)
+        if 'release ' not in header.lower(): # release notes or release anmerkungen
+            continue
+
+        td = tr.find('td')
+        if not td:
+            continue
+
+        content = td.get_text(' ', strip=True)
+        for pat in patterns:
+            m = pat.search(content)
+            if not m:
+                continue
+
+            token = m.group(1)
+            # Roman numeral detection only uppercase
+            if pat.pattern.endswith('(?=\\s*$)'):
+                if token.isupper():
+                    return roman_to_int(token)
+                else:
+                    continue
+            return int(token)
+
     return None
 
 
@@ -304,6 +347,8 @@ def parse_info_from_download_item(tab, content, page_title=None, release_type=No
 
     # determine season
     season_num = extract_season_from_synonyms(content)
+    if not season_num:
+        season_num = find_season_in_release_notes(content)
     if not season_num:
         season_num = extract_season_number_from_title(page_title, release_type, release_title=release_title)
 
