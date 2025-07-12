@@ -99,15 +99,19 @@ def _parse_rows(
                                                      episode):
                     continue
 
-                # drop .XXX. unless user explicitly searched xxx
-                if XXX_REGEX.search(title) and 'xxx' not in search_string.lower():
-                    continue
-                # require resolution/codec
-                if not (RESOLUTION_REGEX.search(title) or CODEC_REGEX.search(title)):
-                    continue
-                # require no spaces in title
-                if " " in title:
-                    continue
+                if 'lazylibrarian' in request_from.lower():
+                    # lazylibrarian can only detect specific date formats / issue numbering
+                    title = shared_state.normalize_magazine_title(title)
+                else:
+                    # drop .XXX. unless user explicitly searched xxx
+                    if XXX_REGEX.search(title) and 'xxx' not in search_string.lower():
+                        continue
+                    # require resolution/codec
+                    if not (RESOLUTION_REGEX.search(title) or CODEC_REGEX.search(title)):
+                        continue
+                    # require no spaces in title
+                    if " " in title:
+                        continue
 
             hoster_names = tr.find("span", class_="button-warezkorb")["data-hoster-names"]
             mirrors = [m.strip().lower() for m in hoster_names.split(",")]
@@ -150,7 +154,14 @@ def _parse_rows(
 def wd_feed(shared_state, start_time, request_from, mirror=None):
     wd = shared_state.values["config"]("Hostnames").get(hostname.lower())
     password = wd
-    feed_type = "Movies" if "Radarr" in request_from else "Serien"
+
+    if "lazylibrarian" in request_from.lower():
+        feed_type = "Ebooks"
+    elif "radarr" in request_from.lower():
+        feed_type = "Movies"
+    else:
+        feed_type = "Serien"
+
     url = f"https://{wd}/{feed_type}"
     headers = {'User-Agent': shared_state.values["user_agent"]}
     try:

@@ -60,7 +60,12 @@ def dt_feed(shared_state, start_time, request_from, mirror=None):
     dt = shared_state.values["config"]("Hostnames").get(hostname.lower())
     password = dt
 
-    feed_type = "media/videos/" if "Radarr" in request_from else "media/tv-show/"
+    if "lazylibrarian" in request_from.lower():
+        feed_type = "learning/"
+    elif "radarr" in request_from.lower():
+        feed_type = "media/videos/"
+    else:
+        feed_type = "media/tv-show/"
 
     if mirror and mirror not in supported_mirrors:
         debug(f'Mirror "{mirror}" not supported by "{hostname.upper()}". Supported: {supported_mirrors}. Skipping!')
@@ -83,6 +88,10 @@ def dt_feed(shared_state, start_time, request_from, mirror=None):
                 source = link_tag['href']
                 title_raw = link_tag.text.strip()
                 title = title_raw.replace(' - ', '-').replace(' ', '.').replace('(', '').replace(')', '')
+
+                if 'lazylibrarian' in request_from.lower():
+                    # lazylibrarian can only detect specific date formats / issue numbering
+                    title = shared_state.normalize_magazine_title(title)
 
                 try:
                     imdb_id = re.search(r'tt\d+', str(article)).group()
@@ -137,7 +146,12 @@ def dt_search(shared_state, start_time, request_from, search_string, mirror=None
     dt = shared_state.values["config"]("Hostnames").get(hostname.lower())
     password = dt
 
-    cat_id = "9" if "Radarr" in request_from else "64"
+    if "lazylibrarian" in request_from.lower():
+        cat_id = "100"
+    elif "radarr" in request_from.lower():
+        cat_id = "9"
+    else:
+        cat_id = "64"
 
     if mirror and mirror not in supported_mirrors:
         debug(f'Mirror "{mirror}" not supported by "{hostname.upper()}". Skipping search!')
@@ -193,11 +207,15 @@ def dt_search(shared_state, start_time, request_from, search_string, mirror=None
                          )
 
                 if not shared_state.is_valid_release(title,
-                                                                     request_from,
-                                                                     search_string,
-                                                                     season,
-                                                                     episode):
+                                                     request_from,
+                                                     search_string,
+                                                     season,
+                                                     episode):
                     continue
+
+                if 'lazylibrarian' in request_from.lower():
+                    # lazylibrarian can only detect specific date formats / issue numbering
+                    title = shared_state.normalize_magazine_title(title)
 
                 try:
                     imdb_id = re.search(r"tt\d+", str(article)).group()

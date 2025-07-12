@@ -279,15 +279,20 @@ def get_packages(shared_state):
 
             try:
                 if package_id:
+                    mb_left = int(mb_left)
+                    mb = int(mb)
+                    percentage = int(100 * (mb - mb_left) / mb)
+
                     downloads["queue"].append({
                         "index": queue_index,
                         "nzo_id": package_id,
                         "priority": "Normal",
                         "filename": name,
                         "cat": category,
-                        "mbleft": int(mb_left),
-                        "mb": int(mb),
+                        "mbleft": mb_left,
+                        "mb": mb,
                         "status": "Downloading",
+                        "percentage": percentage,
                         "timeleft": time_left,
                         "type": package_type,
                         "uuid": package_uuid
@@ -328,6 +333,7 @@ def get_packages(shared_state):
                 "nzo_id": package_id,
                 "name": name,
                 "bytes": int(size),
+                "percentage": 100,
                 "type": "downloader",
                 "uuid": package["uuid"]
             })

@@ -7,6 +7,7 @@ import xml.sax.saxutils as sax_utils
 from base64 import urlsafe_b64decode
 from datetime import datetime
 from functools import wraps
+from urllib.parse import urlparse, parse_qs
 from xml.etree import ElementTree
 
 from bottle import abort, request
@@ -15,6 +16,7 @@ from quasarr.downloads import download
 from quasarr.downloads.packages import get_packages, delete_package
 from quasarr.providers import shared_state
 from quasarr.providers.log import info, debug
+from quasarr.providers.version import get_version
 from quasarr.search import get_search_results
 from quasarr.storage.config import Config
 
@@ -95,9 +97,22 @@ def setup_arr_routes(app):
             # This builds a mock SABnzbd API response based on the My JDownloader integration
             try:
                 mode = request.query.mode
-                if mode == "version":
+                if mode == "auth":
                     return {
-                        "version": "4.3.2"
+                        "auth": "apikey"
+                    }
+                elif mode == "version":
+                    return {
+                        "version": f"Quasarr {get_version()}"
+                    }
+                elif mode == "get_cats":
+                    return {
+                        "categories": [
+                            "*",
+                            "movies",
+                            "tv",
+                            "docs"
+                        ]
                     }
                 elif mode == "get_config":
                     return {
@@ -121,7 +136,12 @@ def setup_arr_routes(app):
                                     "name": "tv",
                                     "order": 2,
                                     "dir": "",
-                                }
+                                },
+                                {
+                                    "name": "docs",
+                                    "order": 3,
+                                    "dir": "",
+                                },
                             ]
                         }
                     }
@@ -131,6 +151,66 @@ def setup_arr_routes(app):
                             "quasarr": True
                         }
                     }
+                elif mode == "addurl":
+                    raw_name = getattr(request.query, "name", None)
+                    if not raw_name:
+                        abort(400, "missing or empty 'name' parameter")
+
+                    payload = False
+                    try:
+                        parsed = urlparse(raw_name)
+                        qs = parse_qs(parsed.query)
+                        payload = qs.get("payload", [None])[0]
+                    except Exception as e:
+                        abort(400, f"invalid URL in 'name': {e}")
+                    if not payload:
+                        abort(400, "missing 'payload' parameter in URL")
+
+                    title = url = mirror = size_mb = password = imdb_id = None
+                    try:
+                        decoded = urlsafe_b64decode(payload.encode()).decode()
+                        parts = decoded.split("|")
+                        if len(parts) != 6:
+                            raise ValueError(f"expected 6 fields, got {len(parts)}")
+                        title, url, mirror, size_mb, password, imdb_id = parts
+                    except Exception as e:
+                        abort(400, f"invalid payload format: {e}")
+
+                    mirror = None if mirror == "None" else mirror
+
+                    nzo_ids = []
+                    info(f'Attempting download for "{title}"')
+                    request_from = "lazylibrarian"
+
+                    downloaded = download(
+                        shared_state,
+                        request_from,
+                        title,
+                        url,
+                        mirror,
+                        size_mb,
+                        password or None,
+                        imdb_id or None,
+                    )
+
+                    try:
+                        success = downloaded["success"]
+                        package_id = downloaded["package_id"]
+                        title = downloaded.get("title", title)
+
+                        if success:
+                            info(f'"{title}" added successfully!')
+                        else:
+                            info(f'"{title}" added unsuccessfully! See log for details.')
+                        nzo_ids.append(package_id)
+                    except KeyError:
+                        info(f'Failed to download "{title}" - no package_id returned')
+
+                    return {
+                        "status": True,
+                        "nzo_ids": nzo_ids
+                    }
+
                 elif mode == "queue" or mode == "history":
                     if request.query.name and request.query.name == "delete":
                         package_id = request.query.value
@@ -192,9 +272,11 @@ def setup_arr_routes(app):
                                   <categories>
                                     <category id="5000" name="TV" />
                                     <category id="2000" name="Movies" />
+                                    <category id="7000" name="Books">
+                                  </category>
                                   </categories>
                                 </caps>'''
-                elif mode in ['movie', 'search', 'tvsearch']:
+                elif mode in ['movie', 'tvsearch', 'book', 'search']:
                     releases = []
 
                     if mode == 'movie':
@@ -204,10 +286,6 @@ def setup_arr_routes(app):
                                                       imdb_id=imdb_id,
                                                       mirror=mirror
                                                       )
-
-                    elif mode == 'search':
-                        info(f'Ignoring search request from {request_from} - only imdbid searches are supported')
-                        releases = [{}]  # sonarr expects this but we will not support non-imdbid searches
 
                     elif mode == 'tvsearch':
                         # supported params: imdbid, season, ep
@@ -220,16 +298,39 @@ def setup_arr_routes(app):
                                                       season=season,
                                                       episode=episode
                                                       )
+                    elif mode == 'book':
+                        info(f"Work in progress for {request_from} - book support is not yet implemented")
+                        author = getattr(request.query, 'author', '')
+                        title = getattr(request.query, 'title', '')
+                        search_phrase = " ".join(filter(None, [author, title]))
+                        releases = get_search_results(shared_state, request_from,
+                                                      search_phrase=search_phrase,
+                                                      mirror=mirror
+                                                      )
+
+                    elif mode == 'search':
+                        if "lazylibrarian" in request_from.lower():
+                            info(f"Work in progress for {request_from} - lazylibrarian support is not yet implemented")
+                            search_phrase = getattr(request.query, 'q', '')
+                            releases = get_search_results(shared_state, request_from,
+                                                          search_phrase=search_phrase,
+                                                          mirror=mirror
+                                                          )
+                        else:
+                            info(f'Ignoring search request from {request_from} - only imdbid searches are supported')
+                            releases = [{}]  # sonarr expects this but we will not support non-imdbid searches
 
                     items = ""
                     for release in releases:
                         release = release.get("details", {})
 
-                        prefix = f'[{release.get("hostname", "").upper()}]'
+                        title = sax_utils.escape(release.get("title", ""))
+                        if not "lazylibrarian" in request_from.lower():
+                            title = f'[{release.get("hostname", "").upper()}] {title}'
 
                         items += f'''
                         <item>
-                            <title>{prefix} {sax_utils.escape(release.get("title", ""))}</title>
+                            <title>{title}</title>
                             <guid isPermaLink="True">{release.get("link", "")}</guid>
                             <link>{release.get("link", "")}</link>
                             <comments>{release.get("source", "")}</comments>

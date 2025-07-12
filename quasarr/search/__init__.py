@@ -2,7 +2,6 @@
 # Quasarr
 # Project by https://github.com/rix1337
 
-import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -19,7 +18,7 @@ from quasarr.search.sources.sl import sl_feed, sl_search
 from quasarr.search.sources.wd import wd_feed, wd_search
 
 
-def get_search_results(shared_state, request_from, imdb_id="", mirror=None, season="", episode=""):
+def get_search_results(shared_state, request_from, imdb_id="", search_phrase="", mirror=None, season="", episode=""):
     results = []
 
     if imdb_id and not imdb_id.startswith('tt'):
@@ -81,6 +80,24 @@ def get_search_results(shared_state, request_from, imdb_id="", mirror=None, seas
             functions.append(lambda: wd_search(shared_state, start_time, request_from, imdb_id,
                                                mirror=mirror,
                                                season=season, episode=episode))
+    elif search_phrase:
+        if dt:
+            functions.append(lambda: dt_search(shared_state, start_time, request_from, search_phrase,
+                                               mirror=mirror,
+                                               season=season, episode=episode))
+        if nx:
+            functions.append(lambda: nx_search(shared_state, start_time, request_from, search_phrase,
+                                               mirror=mirror,
+                                               season=season, episode=episode))
+
+        if sl:
+            functions.append(lambda: sl_search(shared_state, start_time, request_from, search_phrase,
+                                               mirror=mirror,
+                                               season=season, episode=episode))
+        if wd:
+            functions.append(lambda: wd_search(shared_state, start_time, request_from, search_phrase,
+                                               mirror=mirror,
+                                               season=season, episode=episode))
     else:
         if al:
             functions.append(lambda: al_feed(shared_state, start_time, request_from, mirror=mirror))
@@ -95,7 +112,7 @@ def get_search_results(shared_state, request_from, imdb_id="", mirror=None, seas
             functions.append(lambda: dw_feed(shared_state, start_time, request_from, mirror=mirror))
 
         if fx:
-            functions.append(lambda: fx_feed(shared_state, start_time, mirror=mirror))
+            functions.append(lambda: fx_feed(shared_state, start_time, request_from, mirror=mirror))
 
         if mb:
             functions.append(lambda: mb_feed(shared_state, start_time, request_from, mirror=mirror))

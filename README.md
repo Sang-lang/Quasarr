@@ -2,51 +2,102 @@
 
 <img src="https://raw.githubusercontent.com/rix1337/Quasarr/main/Quasarr.png" data-canonical-src="https://raw.githubusercontent.com/rix1337/Quasarr/main/Quasarr.png" width="64" height="64" />
 
-Quasarr connects JDownloader with Radarr and Sonarr. It also decrypts links protected by CAPTCHAs.
+Quasarr connects JDownloader with Radarr, Sonarr and LazyLibrarian. It also decrypts links protected by CAPTCHAs.
 
 [![PyPI version](https://badge.fury.io/py/quasarr.svg)](https://badge.fury.io/py/quasarr)
 [![Discord](https://img.shields.io/discord/1075348594225315891)](https://discord.gg/eM4zA2wWQb)
 [![GitHub Sponsorship](https://img.shields.io/badge/support-me-red.svg)](https://github.com/users/rix1337/sponsorship)
 
-Quasarr poses as a Newznab Indexer and a SABnzbd client.
-It will thus never work in parallel with a real NZB indexer and download client set up.
-Torrents are unaffected. To still use NZB indexers, you must set fixed download clients in the advanced indexer
-settings for Radarr/Sonarr.
+Quasarr pretends to be both `Newznab Indexer` and `SABnzbd client`. Therefore, do not try to use it with real usenet
+indexers or download clients. It simply does not know what NZB or torrent files are.
 
 Quasarr includes a solution to quickly and easily decrypt protected links.
-[Active Sponsors get access to SponsorsHelper to do so automatically.](https://github.com/users/rix1337/sponsorship)
-Alternatively, follow the link from the console output (or discord notification) to solve the CAPTCHA manually.
+[Active Sponsors get access to SponsorsHelper to do so automatically.](https://github.com/rix1337/Quasarr?tab=readme-ov-file#sponsorshelper)
+Alternatively, follow the link from the console output (or discord notification) to solve CAPTCHAs manually.
 Quasarr will confidently handle the rest.
 
 # Instructions
 
-* Tell Quasarr which sites to search for releases. It requires at least one valid source to start up.
-  * By default, Quasarr does not know which sites to scrape for download links.
-  * The setup will guide you through the process of providing valid hostnames for Quasarr to scrape.
-  * Do not ask for help here if you do not know which hostnames to use. Picking them is solely your responsibility.
-  * You may check sites like [Pastebin](https://pastebin.com/search?q=hostnames+quasarr) for user-submitted suggestions.
-* Provide your [My-JDownloader-Credentials](https://my.jdownloader.org)
-    * Consider setting up a fresh JDownloader before you begin.
-    * JDownloader must be running and available to Quasarr.
-    * Quasarr will modify the settings of JDownloader so downloads can be properly handled by Radarr/Sonarr.
-    * If using docker, make extra sure that JDownloader's download path is available to Radarr/Sonarr with the exact
-      same
-      internal and external path mapping. Just matching the external path is not enough.
-* Set up Quasarr as `Newznab Indexer` and `SABnzbd Download Client` in Radarr/Sonarr
-    * Use the `URL` from the `API Information` section of the console output (or copy it from the Quasarr web UI)
-    * Use the `API Key` from the `API Information` section of the console output (or copy it from the Quasarr web UI)
-    * Leave all other settings by default.
-    * Important notice for **Sonarr**:
-        * Ensure all shows, including anime are set to the `Standard` series type.
-        * Quasarr will never find releases for shows set to type `Anime / Absolute`
-    * If you prefer to only get releases for a specific mirror, add the mirror name to the
-      API path in the advanced indexer settings.
-        * Example: `/api/dropbox/` results will only return releases where `dropbox` is explicitly mentioned in a link.
-        * This means that if a mirror is not available at a hostname, the release is ignored or the download will fail.
-          So use this option with caution.
-* To see download status information
-    * Open `Activity` → `Queue` → `Options` in Radarr/Sonarr
-    * Enable `Release Title`
+---
+
+## Quasarr
+
+Tell Quasarr which sites to search for releases. It requires at least one valid source to start up.
+
+> - By default, Quasarr does **not** know which sites to scrape for download links.  
+> - The setup will guide you through the process of providing valid hostnames for Quasarr to scrape.  
+> - Do **not** ask for help here if you do not know which hostnames to use. Picking them is solely your responsibility.  
+> - You may check sites like [Pastebin](https://pastebin.com/search?q=hostnames+quasarr) for user‑submitted suggestions.
+
+---
+
+## JDownloader
+
+1. Run JDownloader and connect it to the My JDownloader service.  
+2. Provide your [My‑JDownloader‑Credentials](https://my.jdownloader.org) to Quasarr during the setup process.
+
+> - Consider setting up a fresh JDownloader before you begin.  
+> - JDownloader must be running and available to Quasarr.  
+> - Quasarr will modify JDownloader’s settings so downloads can be handled by Radarr/Sonarr/LazyLibrarian.  
+> - If using Docker, ensure that JDownloader’s download path is available to Radarr/Sonarr/LazyLibrarian with **exactly the same** internal and external path mapping (matching only the external path is not enough).
+
+---
+
+## Radarr / Sonarr
+
+Set up Quasarr as a **Newznab Indexer** and **SABnzbd Download Client**:
+
+1. **URL**: Use the `URL` from the **API Information** section of the console output (or copy it from the Quasarr web UI).  
+2. **API Key**: Use the `API Key` from the **API Information** section of the console output (or copy it from the Quasarr web UI).  
+3. Leave all other settings at their defaults.
+
+> **Important notice for Sonarr**  
+> - Ensure all shows (including anime) are set to the **Standard** series type.  
+> - Quasarr will never find releases for shows set to **Anime / Absolute**.
+
+---
+
+## LazyLibrarian
+
+> **Important notice**
+> - This feature is experimental and may not work as expected.
+> - Quasarr cannot help you with metadata issues, missing covers, or other LazyLibrarian problems.
+> - Please report issues when one of your hostname yields results through their website, but not in LazyLibrarian.
+
+Set up Quasarr as a **SABnzbd+ Downloader**
+
+1. **SABnzbd URL/Port**: Use port and host parts from `URL` found in the **API Information** section of the console output (or copy it from the Quasarr web UI).  
+2. **SABnzbd API Key**: Use the `API Key` from the **API Information** section of the console output (or copy it from the Quasarr web UI).  
+3. **SABnzbd Category**: Use `docs` to ensure LazyLibrarian does not interfere with Radarr/Sonarr.  
+4. Press `Test SABnzbd` to verify the connection, then `Save changes`.
+
+Set up Quasarr as a **Newznab Provider**:
+1. **Newznab URL**: Use the `URL` from the **API Information** section of the console output (or copy it from the Quasarr web UI).
+2. **Newznab API** Use the `API Key` from the **API Information** section of the console output (or copy it from the Quasarr web UI).
+3. Press `Test` to verify the connection, then `Save changes`.
+
+Fix the `Importing` settings:
+1. Check `Enable OpenLibrary api for book/author information`
+2. Select `OpenLibrary` below `Primary Information Source`
+2. Under `Import languages` add `, Unknown` (and for German users: `, de, ger, de-DE`).
+
+Fix the `Processing` settings:
+1. Under `Folders` add the full Quasarr download path, typically `/downloads/Quasarr/`
+2. If you do not do this,  processing after the download will fail.
+
+
+
+---
+
+## Advanced Settings
+
+To restrict results to a specific mirror, add the mirror name to the Newznab/indexer URL.  
+> **Example:** Appending `/api/dropbox/` will only return releases where `dropbox` is explicitly mentioned in a link.  
+> **Caution:** If a mirror is not available at a hostname, the release will be ignored or the download will fail. Use this option carefully.
+
+To see download status information in Radarr/Sonarr
+1. Open `Activity` → `Queue` → `Options`
+2. Enable `Release Title`
 
 # Docker
 
@@ -66,7 +117,7 @@ docker run -d \
   ghcr.io/rix1337/quasarr:latest
   ```
 
-* `INTERNAL_ADDRESS` is required so Radarr/Sonarr can reach Quasarr. **Must** include port!
+* `INTERNAL_ADDRESS` is required so Radarr/Sonarr/LazyLibrarian can reach Quasarr. **Must** include port!
 * `EXTERNAL_ADDRESS` is optional and helpful if using a reverse proxy. Always protect external access with basic auth!
 * `DISCORD` is optional and must be a valid Discord webhook URL.
 * `HOSTNAMES` is optional and allows skipping the manual hostname step during setup.
@@ -102,9 +153,9 @@ Complexity is the killer of small projects like this one. It must be fought at a
 We will not waste precious time on features that will slow future development cycles down.
 Most feature requests can be satisfied by:
 
-- Existing settings in Radarr/Sonarr
+- Existing settings in Radarr/Sonarr/LazyLibrarian
 - Existing settings in JDownloader
-- Existing tools from the *arr ecosystem that integrate directly with Radarr/Sonarr
+- Existing tools from the *arr ecosystem that integrate directly with Radarr/Sonarr/LazyLibrarian
 
 # Roadmap
 

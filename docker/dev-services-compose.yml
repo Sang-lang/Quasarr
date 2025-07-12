@@ -57,6 +57,26 @@ services:
         max-file: "1"
     restart: unless-stopped
 
+  lazylibrarian:
+    image: lscr.io/linuxserver/lazylibrarian:latest
+    container_name: lazylibrarian
+    environment:
+      - PGID=1000
+      - PUID=1000
+      - TZ=Europe/Berlin
+      - CONFIG_VOLUMES=/config/volumes
+    ports:
+      - "9093:5299"
+    volumes:
+      - ${CONFIG_VOLUMES}/lazylibrarian/config:/config
+      - ${CONFIG_VOLUMES}/lazylibrarian/documents:/documents
+      - ${CONFIG_VOLUMES}/downloads:/downloads
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "1"
+    restart: unless-stopped
+
   flaresolverr:
     image: ghcr.io/flaresolverr/flaresolverr:latest
     container_name: flaresolverr

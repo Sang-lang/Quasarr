@@ -38,35 +38,18 @@ def parse_pubdate_to_iso(pubdate_str):
     return dt.isoformat()
 
 
-hostname = "sl"
-supported_mirrors = ["nitroflare", "ddownload"]  # ignoring captcha-protected multiup/mirrorace for now
-
-
-def extract_size(text):
-    match = re.match(r"([\d\.]+)\s*([KMGT]B)", text, re.IGNORECASE)
-    if match:
-        size = match.group(1)
-        unit = match.group(2).upper()
-        return {"size": size, "sizeunit": unit}
-    else:
-        raise ValueError(f"Invalid size format: {text}")
-
-
-def parse_pubdate_to_iso(pubdate_str):
-    """
-    Parse an RFC-822 pubDate from RSS into an ISO8601 string with timezone.
-    """
-    dt = datetime.datetime.strptime(pubdate_str, '%a, %d %b %Y %H:%M:%S %z')
-    return dt.isoformat()
-
-
 def sl_feed(shared_state, start_time, request_from, mirror=None):
     releases = []
 
     sl = shared_state.values["config"]("Hostnames").get(hostname.lower())
     password = sl
 
-    feed_type = "movies" if "Radarr" in request_from else "tv-shows"
+    if "lazylibrarian" in request_from.lower():
+        feed_type = "ebooks"
+    elif "radarr" in request_from.lower():
+        feed_type = "movies"
+    else:
+        feed_type = "tv-shows"
 
     if mirror and mirror not in supported_mirrors:
         debug(f'Mirror "{mirror}" not supported by "{hostname.upper()}". Supported: {supported_mirrors}. Skipping!')
@@ -82,6 +65,10 @@ def sl_feed(shared_state, start_time, request_from, mirror=None):
         for item in root.find('channel').findall('item'):
             try:
                 title = item.findtext('title').strip()
+                if 'lazylibrarian' in request_from.lower():
+                    # lazylibrarian can only detect specific date formats / issue numbering
+                    title = shared_state.normalize_magazine_title(title)
+
                 source = item.findtext('link').strip()
 
                 desc = item.findtext('description') or ''
@@ -137,7 +124,12 @@ def sl_search(shared_state, start_time, request_from, search_string, mirror=None
     sl = shared_state.values["config"]("Hostnames").get(hostname.lower())
     password = sl
 
-    feed_type = "movies" if "Radarr" in request_from else "tv-shows"
+    if "lazylibrarian" in request_from.lower():
+        feed_type = "ebooks"
+    elif "radarr" in request_from.lower():
+        feed_type = "movies"
+    else:
+        feed_type = "tv-shows"
 
     if mirror and mirror not in supported_mirrors:
         debug(f'Mirror "{mirror}" not supported by "{hostname.upper()}". Supported: {supported_mirrors}. Skipping!')
@@ -168,11 +160,15 @@ def sl_search(shared_state, start_time, request_from, search_string, mirror=None
                 title = a.get_text(strip=True)
 
                 if not shared_state.is_valid_release(title,
-                                                                     request_from,
-                                                                     search_string,
-                                                                     season,
-                                                                     episode):
+                                                     request_from,
+                                                     search_string,
+                                                     season,
+                                                     episode):
                     continue
+
+                if 'lazylibrarian' in request_from.lower():
+                    # lazylibrarian can only detect specific date formats / issue numbering
+                    title = shared_state.normalize_magazine_title(title)
 
                 source = a['href']
 

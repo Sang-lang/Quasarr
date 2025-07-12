@@ -48,6 +48,10 @@ def dw_feed(shared_state, start_time, request_from, mirror=None):
     dw = shared_state.values["config"]("Hostnames").get(hostname.lower())
     password = dw
 
+    if not "arr" in request_from.lower():
+        debug(f'Skipping {request_from} search on "{hostname.upper()}" (unsupported media type)!')
+        return releases
+
     if "Radarr" in request_from:
         feed_type = "videos/filme/"
     else:
@@ -118,6 +122,11 @@ def dw_search(shared_state, start_time, request_from, search_string, mirror=None
     releases = []
     dw = shared_state.values["config"]("Hostnames").get(hostname.lower())
     password = dw
+
+    if not "arr" in request_from.lower():
+        debug(f'Skipping {request_from} search on "{hostname.upper()}" (unsupported media type)!')
+        return releases
+
 
     if "Radarr" in request_from:
         search_type = "videocategory=filme"
