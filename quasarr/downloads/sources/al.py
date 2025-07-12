@@ -49,6 +49,50 @@ def roman_to_int(r: str) -> int:
     return total
 
 
+def extract_season_from_synonyms(soup):
+    """
+    Returns the first season found as "Season N" in the Synonym(s) <td>, or None.
+    Only scans the synonyms cell—no fallback to whole document.
+    """
+
+    syn_td = None
+    for tr in soup.select('tr'):
+        th = tr.find('th')
+        if th and 'synonym' in th.get_text(strip=True).lower():
+            syn_td = tr.find('td')
+            break
+
+    if not syn_td:
+        return None
+
+    text = syn_td.get_text(" ", strip=True)
+
+    synonym_season_patters = [
+        re.compile(r'\b(?:Season|Staffel)\s*0?(\d+)\b', re.IGNORECASE),
+        re.compile(r'\b0?(\d+)(?:st|nd|rd|th)\s+Season\b', re.IGNORECASE),
+        re.compile(r'\b(\d+)\.\s*Staffel\b', re.IGNORECASE),
+        re.compile(r'\b([IVXLCDM]+)\b(?=\s*$)'),  # uppercase Roman at end
+    ]
+
+    # 2) Search for season‐patterns, return on first match
+    for pat in synonym_season_patters:
+        m = pat.search(text)
+        if not m:
+            continue
+
+        tok = m.group(0)
+        # Digit match → extract number
+        dm = re.search(r'(\d+)', tok)
+        if dm:
+            return int(dm.group(1))
+        # Uppercase Roman → convert & return
+        if tok.isupper() and re.fullmatch(r'[IVXLCDM]+', tok):
+            return roman_to_int(tok)
+
+    # nothing found
+    return None
+
+
 def extract_season_number_from_title(page_title, release_type, release_title=""):
     """
     Extracts the season number from the given page title.
@@ -169,7 +213,8 @@ def parse_info_from_feed_entry(block, series_page_title, release_type) -> Releas
     )
 
 
-def parse_info_from_download_item(tab, page_title=None, release_type=None, requested_episode=None) -> ReleaseInfo:
+def parse_info_from_download_item(tab, content, page_title=None, release_type=None,
+                                  requested_episode=None) -> ReleaseInfo:
     """
     Parse a BeautifulSoup 'tab' from a download item into ReleaseInfo.
     """
@@ -258,7 +303,9 @@ def parse_info_from_download_item(tab, page_title=None, release_type=None, reque
         release_group = ""
 
     # determine season
-    season_num = extract_season_number_from_title(page_title, release_type, release_title=release_title)
+    season_num = extract_season_from_synonyms(content)
+    if not season_num:
+        season_num = extract_season_number_from_title(page_title, release_type, release_title=release_title)
 
     # check if season part info is present
     season_part: Optional[int] = None
@@ -400,7 +447,7 @@ def check_release(shared_state, details_html, release_id, title, episode_in_titl
             else:
                 release_type = "movie"
 
-            release_info = parse_info_from_download_item(tab, page_title=page_title, release_type=release_type,
+            release_info = parse_info_from_download_item(tab, soup, page_title=page_title, release_type=release_type,
                                                          requested_episode=episode_in_title)
             real_title = release_info.release_title
             if real_title:
@@ -409,8 +456,9 @@ def check_release(shared_state, details_html, release_id, title, episode_in_titl
                     return real_title, release_id
             else:
                 # Overwrite values so guessing the title only applies the requested episode
-                release_info.episode_min = int(episode_in_title)
-                release_info.episode_max = int(episode_in_title)
+                if episode_in_title:
+                    release_info.episode_min = int(episode_in_title)
+                    release_info.episode_max = int(episode_in_title)
 
                 guessed_title = guess_title(shared_state, page_title, release_info)
                 if guessed_title and guessed_title.lower() != title.lower():
