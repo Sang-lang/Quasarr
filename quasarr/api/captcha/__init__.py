@@ -49,11 +49,23 @@ def setup_captcha_routes(app):
             except KeyError:
                 desired_mirror = None
 
+        if not links:
+            # No links found, show an error message
+            return render_centered_html(f'''
+                <h1><img src="{images.logo}" type="image/png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
+                <p><b>Error:</b> No download links available for this package.</p>
+                <p>
+                    {render_button("Back", "secondary", {"onclick": "location.href='/'"})}
+                </p>
+            ''')
+
         link_options = ""
         if len(links) > 1:
             for link in links:
                 if "filecrypt." in link[0]:
-                    link_options += f'<option value="{link[0]}">{link[1]}</option>'
+                    selected_attr = ' selected' if "rapidgator" in link[0].lower() or "rapidgator" in link[
+                        1].lower() else ''
+                    link_options += f'<option value="{link[0]}"{selected_attr}>{link[1]}</option>'
             link_select = f'''<div id="mirrors-select">
                     <label for="link-select">Mirror:</label>
                     <select id="link-select">
