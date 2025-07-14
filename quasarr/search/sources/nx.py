@@ -20,7 +20,9 @@ def nx_feed(shared_state, start_time, request_from, mirror=None):
     nx = shared_state.values["config"]("Hostnames").get(hostname.lower())
     password = nx
 
-    if "Radarr" in request_from:
+    if "lazylibrarian" in request_from.lower():
+        category = "ebook"
+    elif "radarr" in request_from.lower():
         category = "movie"
     else:
         category = "episode"
@@ -49,6 +51,10 @@ def nx_feed(shared_state, start_time, request_from, mirror=None):
 
             if title:
                 try:
+                    if 'lazylibrarian' in request_from.lower():
+                        # lazylibrarian can only detect specific date formats / issue numbering
+                        title = shared_state.normalize_magazine_title(title)
+
                     source = f"https://{nx}/release/{item['slug']}"
                     imdb_id = item.get('_media', {}).get('imdbid', None)
                     mb = shared_state.convert_to_mb(item)
@@ -97,7 +103,9 @@ def nx_search(shared_state, start_time, request_from, search_string, mirror=None
     nx = shared_state.values["config"]("Hostnames").get(hostname.lower())
     password = nx
 
-    if "Radarr" in request_from:
+    if "lazylibrarian" in request_from.lower():
+        valid_type = "ebook"
+    elif "radarr" in request_from.lower():
         valid_type = "movie"
     else:
         valid_type = "episode"
@@ -134,11 +142,15 @@ def nx_search(shared_state, start_time, request_from, search_string, mirror=None
                 title = item['name']
                 if title:
                     if not shared_state.is_valid_release(title,
-                                                                         request_from,
-                                                                         search_string,
-                                                                         season,
-                                                                         episode):
+                                                         request_from,
+                                                         search_string,
+                                                         season,
+                                                         episode):
                         continue
+
+                    if 'lazylibrarian' in request_from.lower():
+                        # lazylibrarian can only detect specific date formats / issue numbering
+                        title = shared_state.normalize_magazine_title(title)
 
                     try:
                         source = f"https://{nx}/release/{item['slug']}"

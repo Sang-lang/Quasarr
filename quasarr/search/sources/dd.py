@@ -31,6 +31,10 @@ def dd_search(shared_state, start_time, request_from, search_string="", mirror=N
     dd = shared_state.values["config"]("Hostnames").get(hostname.lower())
     password = dd
 
+    if not "arr" in request_from.lower():
+        debug(f'Skipping {request_from} search on "{hostname.upper()}" (unsupported media type)!')
+        return releases
+
     dd_session = retrieve_and_validate_session(shared_state)
     if not dd_session:
         info(f"Could not retrieve valid session for {dd}")

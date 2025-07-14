@@ -19,7 +19,9 @@ from quasarr.providers.notifications import send_discord_message
 
 
 def download(shared_state, request_from, title, url, mirror, size_mb, password, imdb_id=None):
-    if "radarr".lower() in request_from.lower():
+    if "lazylibrarian" in request_from.lower():
+        category = "docs"
+    elif "radarr" in request_from.lower():
         category = "movies"
     else:
         category = "tv"

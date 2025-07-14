@@ -100,8 +100,8 @@ def sf_feed(shared_state, start_time, request_from, mirror=None):
     sf = shared_state.values["config"]("Hostnames").get(hostname.lower())
     password = check(sf)
 
-    if "Radarr" in request_from:
-        debug(f'Skipping Radarr search on "{hostname.upper()}" (unsupported media type at hostname)!')
+    if not "sonarr" in request_from.lower():
+        debug(f'Skipping {request_from} search on "{hostname.upper()}" (unsupported media type)!')
         return releases
 
     if mirror and mirror not in supported_mirrors:
@@ -204,8 +204,8 @@ def sf_search(shared_state, start_time, request_from, search_string, mirror=None
             return releases
         search_string = html.unescape(search_string)
 
-    if "Radarr" in request_from:
-        debug(f'Skipping Radarr search on "{hostname.upper()}" (unsupported media type)!')
+    if not "sonarr" in request_from.lower():
+        debug(f'Skipping {request_from} search on "{hostname.upper()}" (unsupported media type)!')
         return releases
 
     if mirror and mirror not in supported_mirrors:

@@ -25,10 +25,15 @@ def extract_size(text):
         raise ValueError(f"Invalid size format: {text}")
 
 
-def fx_feed(shared_state, start_time, mirror=None):
+def fx_feed(shared_state, start_time, request_from, mirror=None):
     releases = []
 
     fx = shared_state.values["config"]("Hostnames").get(hostname.lower())
+
+    if not "arr" in request_from.lower():
+        debug(f'Skipping {request_from} search on "{hostname.upper()}" (unsupported media type)!')
+        return releases
+
 
     if mirror and mirror not in supported_mirrors:
         debug(f'Mirror "{mirror}" not supported by "{hostname.upper()}". Supported mirrors: {supported_mirrors}.'
@@ -115,6 +120,11 @@ def fx_search(shared_state, start_time, request_from, search_string, mirror=None
     releases = []
     fx = shared_state.values["config"]("Hostnames").get(hostname.lower())
     password = fx.split(".")[0]
+
+    if not "arr" in request_from.lower():
+        debug(f'Skipping {request_from} search on "{hostname.upper()}" (unsupported media type)!')
+        return releases
+
 
     if mirror and mirror not in supported_mirrors:
         debug(f'Mirror "{mirror}" not supported by "{hostname.upper()}". Supported mirrors: {supported_mirrors}.'

@@ -72,6 +72,10 @@ def al_feed(shared_state, start_time, request_from, mirror=None):
     releases = []
     host = shared_state.values["config"]("Hostnames").get(hostname)
 
+    if not "arr" in request_from.lower():
+        debug(f'Skipping {request_from} search on "{hostname.upper()}" (unsupported media type)!')
+        return releases
+
     if "Radarr" in request_from:
         wanted_type = "movie"
     else:
@@ -193,6 +197,10 @@ def al_search(shared_state, start_time, request_from, search_string,
               mirror=None, season=None, episode=None):
     releases = []
     host = shared_state.values["config"]("Hostnames").get(hostname)
+
+    if not "arr" in request_from.lower():
+        debug(f'Skipping {request_from} search on "{hostname.upper()}" (unsupported media type)!')
+        return releases
 
     if "Radarr" in request_from:
         valid_type = "movie"
