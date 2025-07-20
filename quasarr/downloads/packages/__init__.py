@@ -287,7 +287,10 @@ def get_packages(shared_state):
                 if package_id:
                     mb_left = int(mb_left)
                     mb = int(mb)
-                    percentage = int(100 * (mb - mb_left) / mb)
+                    try:
+                        percentage = int(100 * (mb - mb_left) / mb)
+                    except ZeroDivisionError:
+                        percentage = 0
 
                     downloads["queue"].append({
                         "index": queue_index,

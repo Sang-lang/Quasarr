@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from quasarr.providers.log import info
 from quasarr.search.sources.al import al_feed, al_search
 from quasarr.search.sources.by import by_feed, by_search
-from quasarr.search.sources.dd import dd_search
+from quasarr.search.sources.dd import dd_search, dd_feed
 from quasarr.search.sources.dt import dt_feed, dt_search
 from quasarr.search.sources.dw import dw_feed, dw_search
 from quasarr.search.sources.fx import fx_feed, fx_search
@@ -69,7 +69,7 @@ def get_search_results(shared_state, request_from, imdb_id="", search_phrase="",
     feed_map = [
         (al, al_feed),
         (by, by_feed),
-        (dd, dd_search),  # dd_search must be used for feeds as well
+        (dd, dd_feed),
         (dt, dt_feed),
         (dw, dw_feed),
         (fx, fx_feed),

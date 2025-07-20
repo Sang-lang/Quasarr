@@ -90,7 +90,7 @@ def dt_feed(shared_state, start_time, request_from, mirror=None):
                 title = title_raw.replace(' - ', '-').replace(' ', '.').replace('(', '').replace(')', '')
 
                 if 'lazylibrarian' in request_from.lower():
-                    # lazylibrarian can only detect specific date formats / issue numbering
+                    # lazylibrarian can only detect specific date formats / issue numbering for magazines
                     title = shared_state.normalize_magazine_title(title)
 
                 try:
@@ -214,7 +214,7 @@ def dt_search(shared_state, start_time, request_from, search_string, mirror=None
                     continue
 
                 if 'lazylibrarian' in request_from.lower():
-                    # lazylibrarian can only detect specific date formats / issue numbering
+                    # lazylibrarian can only detect specific date formats / issue numbering for magazines
                     title = shared_state.normalize_magazine_title(title)
 
                 try:

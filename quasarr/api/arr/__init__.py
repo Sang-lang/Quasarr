@@ -299,7 +299,6 @@ def setup_arr_routes(app):
                                                       episode=episode
                                                       )
                     elif mode == 'book':
-                        info(f"Work in progress for {request_from} - book support is not yet implemented")
                         author = getattr(request.query, 'author', '')
                         title = getattr(request.query, 'title', '')
                         search_phrase = " ".join(filter(None, [author, title]))
@@ -310,7 +309,6 @@ def setup_arr_routes(app):
 
                     elif mode == 'search':
                         if "lazylibrarian" in request_from.lower():
-                            info(f"Work in progress for {request_from} - lazylibrarian support is not yet implemented")
                             search_phrase = getattr(request.query, 'q', '')
                             releases = get_search_results(shared_state, request_from,
                                                           search_phrase=search_phrase,

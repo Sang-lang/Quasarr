@@ -52,7 +52,7 @@ def nx_feed(shared_state, start_time, request_from, mirror=None):
             if title:
                 try:
                     if 'lazylibrarian' in request_from.lower():
-                        # lazylibrarian can only detect specific date formats / issue numbering
+                        # lazylibrarian can only detect specific date formats / issue numbering for magazines
                         title = shared_state.normalize_magazine_title(title)
 
                     source = f"https://{nx}/release/{item['slug']}"
@@ -149,7 +149,7 @@ def nx_search(shared_state, start_time, request_from, search_string, mirror=None
                         continue
 
                     if 'lazylibrarian' in request_from.lower():
-                        # lazylibrarian can only detect specific date formats / issue numbering
+                        # lazylibrarian can only detect specific date formats / issue numbering for magazines
                         title = shared_state.normalize_magazine_title(title)
 
                     try:
