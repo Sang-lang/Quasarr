@@ -225,6 +225,8 @@ def get_packages(shared_state):
                     package_id = package["comment"]
                     if "movies" in package_id:
                         category = "movies"
+                    elif "docs" in package_id:
+                        category = "docs"
                     else:
                         category = "tv"
                 except TypeError:
@@ -256,6 +258,8 @@ def get_packages(shared_state):
                     package_id = package["comment"]
                     if "movies" in package_id:
                         category = "movies"
+                    elif "docs" in package_id:
+                        category = "docs"
                     else:
                         category = "tv"
                 except TypeError:
@@ -270,6 +274,8 @@ def get_packages(shared_state):
                     package_id = package["package_id"]
                     if "movies" in package_id:
                         category = "movies"
+                    elif "docs" in package_id:
+                        category = "docs"
                     else:
                         category = "tv"
                 except TypeError:
@@ -312,6 +318,8 @@ def get_packages(shared_state):
                 package_id = package["comment"]
                 if "movies" in package_id:
                     category = "movies"
+                elif "docs" in package_id:
+                    category = "docs"
                 else:
                     category = "tv"
             except TypeError:
