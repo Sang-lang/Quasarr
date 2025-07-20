@@ -22,7 +22,7 @@ setuptools.setup(
     version=get_version(),
     author="rix1337",
     author_email="",
-    description="Full template for python web projects with Docker, GitHub Actions, PyPI, and more.",
+    description="Quasarr connects JDownloader with Radarr, Sonarr and LazyLibrarian. It also decrypts links protected by CAPTCHAs.",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/rix1337/Quasarr",
