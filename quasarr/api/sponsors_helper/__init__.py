@@ -32,11 +32,16 @@ def setup_sponsors_helper_routes(app):
                 mirror = None if (mirror := data.get('mirror')) == "None" else mirror
                 password = data["password"]
 
+                fichier = [ln for ln in links if "fichier" in ln[1].lower()]
+                rapid = [ln for ln in links if "rapidgator" in ln[1].lower()]
+                others = [ln for ln in links if "fichier" not in ln[1].lower() and "rapidgator" not in ln[1].lower()]
+                prioritized_links = fichier + rapid + others
+
             return {
                 "to_decrypt": {
                     "name": title,
                     "id": package_id,
-                    "url": links,
+                    "url": prioritized_links,
                     "mirror": mirror,
                     "password": password,
                     "max_attempts": 3

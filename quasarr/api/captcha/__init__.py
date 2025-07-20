@@ -44,12 +44,18 @@ def setup_captcha_routes(app):
             title = data["title"]
             links = data["links"]
             password = data["password"]
+
+            fichier = [ln for ln in links if "1fichier" in ln[1].lower()]
+            rapid = [ln for ln in links if "rapidgator" in ln[1].lower()]
+            others = [ln for ln in links if "1fichier" not in ln[1].lower() and "rapidgator" not in ln[1].lower()]
+            prioritized_links = fichier + rapid + others
+
             try:
                 desired_mirror = data["mirror"]
             except KeyError:
                 desired_mirror = None
 
-        if not links:
+        if not prioritized_links:
             # No links found, show an error message
             return render_centered_html(f'''
                 <h1><img src="{images.logo}" type="image/png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
@@ -60,12 +66,10 @@ def setup_captcha_routes(app):
             ''')
 
         link_options = ""
-        if len(links) > 1:
-            for link in links:
+        if len(prioritized_links) > 1:
+            for link in prioritized_links:
                 if "filecrypt." in link[0]:
-                    selected_attr = ' selected' if "rapidgator" in link[0].lower() or "rapidgator" in link[
-                        1].lower() else ''
-                    link_options += f'<option value="{link[0]}"{selected_attr}>{link[1]}</option>'
+                    link_options += f'<option value="{link[0]}">{link[1]}</option>'
             link_select = f'''<div id="mirrors-select">
                     <label for="link-select">Mirror:</label>
                     <select id="link-select">
@@ -80,7 +84,7 @@ def setup_captcha_routes(app):
                 </script>
             '''
         else:
-            link_select = f'<div id="mirrors-select">Mirror: <b>{links[0][1]}</b></div>'
+            link_select = f'<div id="mirrors-select">Mirror: <b>{prioritized_links[0][1]}</b></div>'
 
         content = render_centered_html(r'''
             <script type="text/javascript">
@@ -126,7 +130,7 @@ def setup_captcha_routes(app):
                     <h1><img src="{images.logo}" type="image/png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
                     <div id="captcha-key"></div>
                     {link_select}<br><br>
-                    <input type="hidden" id="link-hidden" value="{links[0][0]}" />
+                    <input type="hidden" id="link-hidden" value="{prioritized_links[0][0]}" />
                     <div class="captcha-container">
                         <div id="puzzle-captcha" aria-style="mobile">
                             <strong>Your adblocker prevents the captcha from loading. Disable it!</strong>
