@@ -4,21 +4,27 @@
 
 import json
 import re
+from base64 import urlsafe_b64encode, urlsafe_b64decode
+from urllib.parse import quote, unquote
 
 import requests
-from bottle import request, response
+from bottle import request, response, redirect
 
 import quasarr.providers.html_images as images
 from quasarr.downloads.linkcrypters.filecrypt import get_filecrypt_links
 from quasarr.providers import shared_state
 from quasarr.providers.html_templates import render_button, render_centered_html
-from quasarr.providers.log import info
+from quasarr.providers.log import info, debug
 from quasarr.providers.obfuscated import captcha_js, captcha_values
+
+
+def js_single_quoted_string_safe(text):
+    return text.replace('\\', '\\\\').replace("'", "\\'")
 
 
 def setup_captcha_routes(app):
     @app.get('/captcha')
-    def serve_captcha():
+    def check_captcha():
         try:
             device = shared_state.values["device"]
         except KeyError:
@@ -44,16 +50,69 @@ def setup_captcha_routes(app):
             title = data["title"]
             links = data["links"]
             password = data["password"]
+            try:
+                desired_mirror = data["mirror"]
+            except KeyError:
+                desired_mirror = None
 
+            # This is set for circle CAPTCHAs
+            session = data.get("session", None)
+
+            # This is required for cutcaptcha
             fichier = [ln for ln in links if "1fichier" in ln[1].lower()]
             rapid = [ln for ln in links if "rapidgator" in ln[1].lower()]
             others = [ln for ln in links if "1fichier" not in ln[1].lower() and "rapidgator" not in ln[1].lower()]
             prioritized_links = fichier + rapid + others
 
-            try:
-                desired_mirror = data["mirror"]
-            except KeyError:
-                desired_mirror = None
+            payload = {
+                "package_id": package_id,
+                "title": title,
+                "password": password,
+                "mirror": desired_mirror,
+                "session": session,
+                "links": prioritized_links
+            }
+
+            encoded_payload = urlsafe_b64encode(json.dumps(payload).encode()).decode()
+
+            if session:
+                debug(f'Session "{session}" found, redirecting to circle CAPTCHA')
+                redirect(f"/captcha/circle?data={quote(encoded_payload)}")
+            else:
+                debug(f"Redirecting to cutcaptcha")
+                redirect(f"/captcha/cutcaptcha?data={quote(encoded_payload)}")
+
+            return render_centered_html(f'''<h1><img src="{images.logo}" type="image/png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
+            <p>Unexpected Error!</p>
+            <p>
+                {render_button("Back", "secondary", {"onclick": "location.href='/'"})}
+            </p>''')
+
+    def decode_payload():
+        encoded = request.query.get('data')
+        try:
+            decoded = urlsafe_b64decode(unquote(encoded)).decode()
+            return json.loads(decoded)
+        except Exception as e:
+            return {"error": f"Failed to decode payload: {str(e)}"}
+
+    # The following route are for cutcaptcha
+    @app.get('/captcha/cutcaptcha')
+    def serve_cutcaptcha():
+        payload = decode_payload()
+
+        if "error" in payload:
+            return render_centered_html(f'''<h1><img src="{images.logo}" type="image/png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
+            <p>{payload["error"]}</p>
+            <p>
+                {render_button("Back", "secondary", {"onclick": "location.href='/'"})}
+            </p>''')
+
+        package_id = payload.get("package_id")
+        title = payload.get("title")
+        password = payload.get("password")
+        desired_mirror = payload.get("mirror")
+        prioritized_links = payload.get("links")
 
         if not prioritized_links:
             # No links found, show an error message
@@ -95,9 +154,7 @@ def setup_captcha_routes(app):
                     document.getElementById("mirrors-select").remove();
                     document.getElementById("captcha-key").innerText = 'Using result "' + token + '" to decrypt links...';
                     var link = document.getElementById("link-hidden").value;
-                    const currentPath = window.location.pathname;
-                    const endpoint = '/decrypt-filecrypt';
-                    const fullPath = currentPath.endsWith('/') ? currentPath + endpoint.slice(1) : currentPath + endpoint;
+                    const fullPath = '/captcha/decrypt-filecrypt';
 
                     fetch(fullPath, {
                         method: 'POST',
@@ -107,7 +164,7 @@ def setup_captcha_routes(app):
                         body: JSON.stringify({ 
                             token: token,
                             ''' + f'''package_id: '{package_id}',
-                            title: '{title}',
+                            title: '{js_single_quoted_string_safe(title)}',
                             link: link,
                             password: '{password}',
                             mirror: '{desired_mirror}',
@@ -139,7 +196,7 @@ def setup_captcha_routes(app):
                     <div id="reload-button" style="display: none;">
                     <p>
                     {render_button("Solve another CAPTCHA", "secondary", {
-            "onclick": "location.reload()",
+            "onclick": "location.href='/captcha'",
         })}</p>
         </div>
             <br>
@@ -231,7 +288,7 @@ def setup_captcha_routes(app):
             return {"success": False, "title": "No protected packages found! CAPTCHA not needed."}
 
         download_links = []
-
+        title = "Unknown Package"
         try:
             data = request.json
             token = data.get('token')
@@ -249,11 +306,29 @@ def setup_captcha_routes(app):
                 info(f"Decrypted {len(download_links)} download links for {title}")
 
                 if download_links:
-                    downloaded = shared_state.download_package(download_links, title, password, package_id)
-                    if downloaded:
-                        shared_state.get_db("protected").delete(package_id)
+                    if download_links.get("status", "") == "replaced":
+                        replace_url = download_links.get("replace_url")
+                        session = download_links.get("session")
+                        mirror = download_links.get("mirror", "filecrypt")
+
+                        blob = json.dumps(
+                            {
+                                "title": title,
+                                "links": [replace_url, mirror],
+                                "size_mb": 0,
+                                "password": password,
+                                "mirror": mirror,
+                                "session": session
+                            })
+                        shared_state.get_db("protected").update_store(package_id, blob)
+                        info(f"Another CAPTCHA solution is required for {mirror} link: {replace_url}")
+
                     else:
-                        raise RuntimeError("Submitting Download to JDownloader failed")
+                        downloaded = shared_state.download_package(download_links, title, password, package_id)
+                        if downloaded:
+                            shared_state.get_db("protected").delete(package_id)
+                        else:
+                            raise RuntimeError("Submitting Download to JDownloader failed")
                 else:
                     raise ValueError("No download links found")
 
@@ -261,3 +336,130 @@ def setup_captcha_routes(app):
             info(f"Error decrypting: {e}")
 
         return {"success": bool(download_links), "title": title}
+
+    # The following routes are for circle CAPTCHA
+    @app.get('/captcha/circle')
+    def serve_circle():
+        payload = decode_payload()
+
+        if "error" in payload:
+            return render_centered_html(f'''<h1><img src="{images.logo}" type="image/png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
+            <p>{payload["error"]}</p>
+            <p>
+                {render_button("Back", "secondary", {"onclick": "location.href='/'"})}
+            </p>''')
+
+        package_id = payload.get("package_id")
+        session = payload.get("session")
+        url = payload.get("links")[0] if payload.get("links") else None
+
+        if not url or not session or not package_id:
+            response.status = 400
+            return "Missing required parameters"
+
+        return render_centered_html(f"""
+        <!DOCTYPE html>
+        <html>
+          <body>
+            <h1><img src="{images.logo}" type="image/png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
+            <form action="/captcha/decrypt-filecrypt-circle?url={url}&session={session}&&package_id={package_id}" method="post">
+              <input type="image" src="/captcha/circle.php?session={session}" name="button" alt="Captcha">
+            </form>
+            <p>
+                {render_button("Back", "secondary", {"onclick": "location.href='/'"})}
+            </p>
+          </body>
+        </html>""")
+
+    @app.get('/captcha/circle.php')
+    def proxy_circle_php():
+        target_url = "https://filecrypt.cc/captcha/circle.php"
+
+        session = request.query.get('session')
+        if not session:
+            response.status = 400
+            return "Missing session parameter"
+
+        headers = {'User-Agent': shared_state.values["user_agent"]}
+        cookies = {'PHPSESSID': session}
+
+        resp = requests.get(target_url, headers=headers, cookies=cookies, verify=False)
+
+        response.content_type = resp.headers.get('Content-Type', 'application/octet-stream')
+        return resp.content
+
+    @app.post('/captcha/decrypt-filecrypt-circle')
+    def proxy_form_submit():
+        url = request.query.get('url')
+        session = request.query.get('session')
+        package_id = request.query.get('package_id')
+
+        if not url or not session or not package_id:
+            response.status = 400
+            return "Missing required parameters"
+
+        cookies = {'PHPSESSID': session}
+
+        headers = {
+            'User-Agent': shared_state.values["user_agent"],
+        }
+
+        post_data = request.forms
+        data = {k: v for k, v in post_data.items()}
+
+        resp = requests.post(url, cookies=cookies, headers=headers, data=data, verify=False)
+
+        response.content_type = resp.headers.get('Content-Type', 'text/html')
+
+        solution = "You did not solve the CAPTCHA correctly. Please try again."
+        match = re.search(r"top\.location\.href\s*=\s*['\"]([^'\"]+)['\"]", resp.text)
+        if match:
+            solution = match.group(1)
+            info(f"Redirect URL: {solution}")
+            try:
+                redirect_resp = requests.get(solution, headers=headers, cookies=cookies, allow_redirects=True,
+                                             timeout=10)
+                if "expired" in redirect_resp.text.lower():
+                    solution = f"The CAPTCHA session has expired. Deleting package: {package_id}"
+                    info(solution)
+                    shared_state.get_db("protected").delete(package_id)
+                else:
+                    download_link = redirect_resp.url
+                    if redirect_resp.ok:
+                        solution = f"Successfully resolved download link: {download_link}"
+                        info(solution)
+
+                        raw_data = shared_state.get_db("protected").retrieve(package_id)
+                        data = json.loads(raw_data)
+                        title = data.get("title")
+                        password = data.get("password", "")
+
+                        downloaded = shared_state.download_package([download_link], title, password, package_id)
+                        if downloaded:
+                            shared_state.get_db("protected").delete(package_id)
+                        else:
+                            raise RuntimeError("Submitting Download to JDownloader failed")
+                    else:
+                        info(
+                            f"Failed to reach redirect target. Status: {redirect_resp.status_code}, Solution: {solution}")
+            except Exception as e:
+                info(f"Error while resolving download link: {e}")
+        else:
+            info("You did not solve the CAPTCHA correctly. Please try again.")
+
+        return render_centered_html(f"""
+        <!DOCTYPE html>
+        <html>
+          <body>
+            <h1><img src="{images.logo}" type="image/png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
+            <p>{solution}</p>
+            <p>
+                {render_button("Solve another CAPTCHA", "secondary", {
+            "onclick": "location.href='/captcha'",
+        })}
+            </p>
+            <p>
+                {render_button("Back", "secondary", {"onclick": "location.href='/'"})}
+            </p>
+          </body>
+        </html>""")
