@@ -32,10 +32,13 @@ def convert_to_rss_date(date_str):
 
 
 def extract_size(text):
-    m = re.match(r"(\d+(?:\.\d+)?)\s*([A-Za-z]+)", text)
+    m = re.match(r"(\d+(?:[.,]\d+)?)\s*([A-Za-z]+)", text)
     if not m:
         raise ValueError(f"Invalid size format: {text!r}")
-    return {"size": m.group(1), "sizeunit": m.group(2)}
+    size_str = m.group(1).replace(',', '.')
+    sizeunit = m.group(2)
+    size_float = float(size_str)  # convert to float here
+    return {"size": size_float, "sizeunit": sizeunit}
 
 
 def _parse_posts(soup, shared_state, base_url, password, mirror_filter,
@@ -66,7 +69,10 @@ def _parse_posts(soup, shared_state, base_url, password, mirror_filter,
             if not is_search:
                 table = entry
                 # title & source
-                link_tag = table.find('th').find('a')
+                try:
+                    link_tag = table.find('th').find('a')
+                except AttributeError:
+                    link_tag = table.find('a')
                 title = link_tag.get_text(strip=True)
                 if 'lazylibrarian' in request_from.lower():
                     # lazylibrarian can only detect specific date formats / issue numbering for magazines
@@ -158,7 +164,7 @@ def by_feed(shared_state, start_time, request_from, mirror=None):
     try:
         html_doc = requests.get(url, headers=headers, timeout=10).content
         soup = BeautifulSoup(html_doc, 'html.parser')
-        releases = _parse_posts(soup, shared_state, base_url, password, mirror_filter=mirror)
+        releases = _parse_posts(soup, shared_state, base_url, password, request_from=request_from, mirror_filter=mirror)
     except Exception as e:
         info(f"Error loading {hostname.upper()} feed: {e}")
         releases = []

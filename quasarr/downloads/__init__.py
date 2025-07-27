@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 # Quasarr
 # Project by https://github.com/rix1337
+#
+# Special note: The signatures of all handlers must stay the same so we can neatly call them in download()
+# Same is true for every get_xx_download_links() function in sources/xx.py
 
 import json
 
@@ -19,8 +22,8 @@ from quasarr.providers.log import info
 from quasarr.providers.notifications import send_discord_message
 
 
-def handle_unprotected(shared_state, title, password, package_id, imdb_id, label, url, *,
-                       links=None, func=None, mirror=None):
+def handle_unprotected(shared_state, title, password, package_id, imdb_id, url,
+                       mirror=None, size_mb=None, links=None, func=None, label=""):
     if func:
         links = func(shared_state, url, mirror, title)
 
@@ -40,7 +43,8 @@ def handle_unprotected(shared_state, title, password, package_id, imdb_id, label
     return {"success": True, "title": title}
 
 
-def handle_protected(shared_state, url, mirror, title, password, size_mb, package_id, imdb_id, func, label):
+def handle_protected(shared_state, title, password, package_id, imdb_id, url,
+                     mirror=None, size_mb=None, func=None, label=""):
     links = func(shared_state, url, mirror, title)
     if links:
         info(f'CAPTCHA-Solution required for "{title}" at: "{shared_state.values['external_address']}/captcha"')
@@ -54,58 +58,19 @@ def handle_protected(shared_state, url, mirror, title, password, size_mb, packag
     return {"success": True, "title": title}
 
 
-def handle_al(shared_state, url, mirror, title, password, size_mb, package_id, imdb_id):
+def handle_al(shared_state, title, password, package_id, imdb_id, url, mirror, size_mb):
     data = get_al_download_links(shared_state, url, mirror, title, password)
     links = data.get("links", [])
     title = data.get("title", title)
     password = data.get("password", "")
     return handle_unprotected(
-        shared_state, title, password, package_id, imdb_id, 'AL', url,
-        links=links
+        shared_state, title, password, package_id, imdb_id, url,
+        links=links,
+        label='AL'
     )
 
 
-def handle_sl(shared_state, url, mirror, title, password, size_mb, package_id, imdb_id):
-    data = get_sl_download_links(shared_state, url, mirror, title)
-    links = data.get("links")
-    if not imdb_id:
-        imdb_id = data.get("imdb_id")
-    return handle_unprotected(
-        shared_state, title, password, package_id, imdb_id, 'SL', url,
-        links=links
-    )
-
-
-def handle_wd(shared_state, url, mirror, title, password, size_mb, package_id, imdb_id):
-    data = get_wd_download_links(shared_state, url, mirror, title)
-    links = data.get("links")
-    if not links:
-        fail(title, package_id, shared_state,
-             reason=f'Offline / no links found for "{title}" on WD - "{url}"')
-        return {"success": False, "title": title}
-
-    decrypted = decrypt_links_if_hide(shared_state, links)
-    if decrypted and decrypted.get("status") != "none":
-        status = decrypted.get("status", "error")
-        links = decrypted.get("results", [])
-        if status == "success":
-            return handle_unprotected(
-                shared_state, title, password, package_id, imdb_id, 'WD', url,
-                links=links
-            )
-        else:
-            fail(title, package_id, shared_state,
-                 reason=f'Error decrypting hide.cx links for "{title}" on WD - "{url}"')
-            return {"success": False, "title": title}
-
-    return handle_protected(
-        shared_state, url, mirror, title, password, size_mb, package_id, imdb_id,
-        func=lambda ss, u, m, t: links,
-        label='WD'
-    )
-
-
-def handle_sf(shared_state, url, mirror, title, password, size_mb, package_id, imdb_id):
+def handle_sf(shared_state, title, password, package_id, imdb_id, url, mirror, size_mb):
     if url.startswith(f"https://{shared_state.values['config']('Hostnames').get('sf')}/external"):
         url = resolve_sf_redirect(url, shared_state.values["user_agent"])
     elif url.startswith(f"https://{shared_state.values['config']('Hostnames').get('sf')}/"):
@@ -120,9 +85,54 @@ def handle_sf(shared_state, url, mirror, title, password, size_mb, package_id, i
         return {"success": False, "title": title}
 
     return handle_protected(
-        shared_state, url, mirror, title, password, size_mb, package_id, imdb_id,
+        shared_state, title, password, package_id, imdb_id, url,
+        mirror=mirror,
+        size_mb=size_mb,
         func=lambda ss, u, m, t: [[url, "filecrypt"]],
         label='SF'
+    )
+
+
+def handle_sl(shared_state, title, password, package_id, imdb_id, url, mirror, size_mb):
+    data = get_sl_download_links(shared_state, url, mirror, title)
+    links = data.get("links")
+    if not imdb_id:
+        imdb_id = data.get("imdb_id")
+    return handle_unprotected(
+        shared_state, title, password, package_id, imdb_id, url,
+        links=links,
+        label='SL'
+    )
+
+
+def handle_wd(shared_state, title, password, package_id, imdb_id, url, mirror, size_mb):
+    data = get_wd_download_links(shared_state, url, mirror, title)
+    links = data.get("links")
+    if not links:
+        fail(title, package_id, shared_state,
+             reason=f'Offline / no links found for "{title}" on WD - "{url}"')
+        return {"success": False, "title": title}
+
+    decrypted = decrypt_links_if_hide(shared_state, links)
+    if decrypted and decrypted.get("status") != "none":
+        status = decrypted.get("status", "error")
+        links = decrypted.get("results", [])
+        if status == "success":
+            return handle_unprotected(
+                shared_state, title, password, package_id, imdb_id, url,
+                links=links, label='WD'
+            )
+        else:
+            fail(title, package_id, shared_state,
+                 reason=f'Error decrypting hide.cx links for "{title}" on WD - "{url}"')
+            return {"success": False, "title": title}
+
+    return handle_protected(
+        shared_state, title, password, package_id, imdb_id, url,
+        mirror=mirror,
+        size_mb=size_mb,
+        func=lambda ss, u, m, t: links,
+        label='WD'
     )
 
 
@@ -168,12 +178,12 @@ def download(shared_state, request_from, title, url, mirror, size_mb, password, 
 
     for flag, fn in handlers:
         if flag and flag.lower() in url.lower():
-            result = fn(shared_state, url, mirror, title, password, size_mb, package_id, imdb_id)
-            return {"package_id": package_id, **result}
+            return {"package_id": package_id,
+                    **fn(shared_state, title, password, package_id, imdb_id, url, mirror, size_mb)}
 
     if "filecrypt" in url.lower():
         return {"package_id": package_id, **handle_protected(
-            shared_state, url, mirror, title, password, size_mb, package_id, imdb_id,
+            shared_state, title, password, package_id, imdb_id, url, mirror, size_mb,
             func=lambda ss, u, m, t: [[u, "filecrypt"]],
             label='filecrypt'
         )}

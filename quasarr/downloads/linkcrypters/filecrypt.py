@@ -282,6 +282,10 @@ def get_filecrypt_links(shared_state, token, title, url, password=None, mirror=N
                             ]
                 links.extend(CNL(crypted_data).decrypt())
             except:
+                if "The owner of this folder has deactivated all hosts in this container in their settings." in soup.text:
+                    info(f"Mirror deactivated by the owner: {mirror}")
+                    continue
+
                 info("Click'n'Load not found! Falling back to DLC...")
                 try:
                     crypted_payload = soup.find("button", {"class": "dlcdownload"}).get("onclick")

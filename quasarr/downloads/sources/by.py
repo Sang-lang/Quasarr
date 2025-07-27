@@ -12,7 +12,7 @@ from bs4 import BeautifulSoup
 from quasarr.providers.log import info, debug
 
 
-def get_by_download_links(shared_state, url, mirror, title):
+def get_by_download_links(shared_state, url, mirror, title): # signature must align with other download link functions!
     by = shared_state.values["config"]("Hostnames").get("by")
     headers = {
         'User-Agent': shared_state.values["user_agent"],

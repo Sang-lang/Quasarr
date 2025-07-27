@@ -59,10 +59,9 @@ def setup_captcha_routes(app):
             session = data.get("session", None)
 
             # This is required for cutcaptcha
-            fichier = [ln for ln in links if "1fichier" in ln[1].lower()]
             rapid = [ln for ln in links if "rapidgator" in ln[1].lower()]
-            others = [ln for ln in links if "1fichier" not in ln[1].lower() and "rapidgator" not in ln[1].lower()]
-            prioritized_links = fichier + rapid + others
+            others = [ln for ln in links if "rapidgator" not in ln[1].lower()]
+            prioritized_links = rapid + others
 
             payload = {
                 "package_id": package_id,
@@ -287,7 +286,7 @@ def setup_captcha_routes(app):
         if not protected:
             return {"success": False, "title": "No protected packages found! CAPTCHA not needed."}
 
-        download_links = []
+        links = []
         title = "Unknown Package"
         try:
             data = request.json
@@ -301,15 +300,12 @@ def setup_captcha_routes(app):
             if token:
                 info(f"Received token: {token}")
                 info(f"Decrypting links for {title}")
-                download_links = get_filecrypt_links(shared_state, token, title, link, password=password, mirror=mirror)
-
-                info(f"Decrypted {len(download_links)} download links for {title}")
-
-                if download_links:
-                    if download_links.get("status", "") == "replaced":
-                        replace_url = download_links.get("replace_url")
-                        session = download_links.get("session")
-                        mirror = download_links.get("mirror", "filecrypt")
+                decrypted = get_filecrypt_links(shared_state, token, title, link, password=password, mirror=mirror)
+                if decrypted:
+                    if decrypted.get("status", "") == "replaced":
+                        replace_url = decrypted.get("replace_url")
+                        session = decrypted.get("session")
+                        mirror = decrypted.get("mirror", "filecrypt")
 
                         blob = json.dumps(
                             {
@@ -324,7 +320,11 @@ def setup_captcha_routes(app):
                         info(f"Another CAPTCHA solution is required for {mirror} link: {replace_url}")
 
                     else:
-                        downloaded = shared_state.download_package(download_links, title, password, package_id)
+                        links = decrypted.get("links", [])
+                        info(f"Decrypted {len(links)} download links for {title}")
+                        if not links:
+                            raise ValueError("No download links found after decryption")
+                        downloaded = shared_state.download_package(links, title, password, package_id)
                         if downloaded:
                             shared_state.get_db("protected").delete(package_id)
                         else:
@@ -335,7 +335,7 @@ def setup_captcha_routes(app):
         except Exception as e:
             info(f"Error decrypting: {e}")
 
-        return {"success": bool(download_links), "title": title}
+        return {"success": bool(links), "title": title}
 
     # The following routes are for circle CAPTCHA
     @app.get('/captcha/circle')

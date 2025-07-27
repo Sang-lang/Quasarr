@@ -5,7 +5,7 @@
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from quasarr.providers.log import info
+from quasarr.providers.log import info, debug
 from quasarr.search.sources.al import al_feed, al_search
 from quasarr.search.sources.by import by_feed, by_search
 from quasarr.search.sources.dd import dd_search, dd_feed
@@ -24,6 +24,8 @@ def get_search_results(shared_state, request_from, imdb_id="", search_phrase="",
 
     if imdb_id and not imdb_id.startswith('tt'):
         imdb_id = f'tt{imdb_id}'
+
+    docs_search = "lazylibrarian" in request_from.lower()
 
     al = shared_state.values["config"]("Hostnames").get("al")
     by = shared_state.values["config"]("Hostnames").get("by")
@@ -80,7 +82,7 @@ def get_search_results(shared_state, request_from, imdb_id="", search_phrase="",
         (wd, wd_feed),
     ]
 
-    if imdb_id:
+    if imdb_id:  # only Radarr/Sonarr are using imdb_id
         args, kwargs = (
             (shared_state, start_time, request_from, imdb_id),
             {'mirror': mirror, 'season': season, 'episode': episode}
@@ -89,7 +91,7 @@ def get_search_results(shared_state, request_from, imdb_id="", search_phrase="",
             if flag:
                 functions.append(lambda f=func, a=args, kw=kwargs: f(*a, **kw))
 
-    elif search_phrase:
+    elif search_phrase and docs_search:  # only LazyLibrarian is allowed to use search_phrase
         args, kwargs = (
             (shared_state, start_time, request_from, search_phrase),
             {'mirror': mirror, 'season': season, 'episode': episode}
@@ -97,6 +99,10 @@ def get_search_results(shared_state, request_from, imdb_id="", search_phrase="",
         for flag, func in phrase_map:
             if flag:
                 functions.append(lambda f=func, a=args, kw=kwargs: f(*a, **kw))
+
+    elif search_phrase:
+        debug(
+            f"Search phrase '{search_phrase}' is not supported for {request_from}. Only LazyLibrarian can use search phrases.")
 
     else:
         args, kwargs = (

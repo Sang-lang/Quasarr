@@ -32,7 +32,7 @@ def get_filer_folder_links(shared_state, url):
     return url
 
 
-def get_nx_download_links(shared_state, url, title):
+def get_nx_download_links(shared_state, url, mirror, title): # signature must align with other download link functions!
     nx = shared_state.values["config"]("Hostnames").get("nx")
 
     if f"{nx}/release/" not in url:

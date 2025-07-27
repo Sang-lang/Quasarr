@@ -10,7 +10,7 @@ from bs4 import BeautifulSoup
 from quasarr.providers.log import info, debug
 
 
-def get_dw_download_links(shared_state, url, mirror, title):
+def get_dw_download_links(shared_state, url, mirror, title): # signature must align with other download link functions!
     dw = shared_state.values["config"]("Hostnames").get("dw")
     ajax_url = "https://" + dw + "/wp-admin/admin-ajax.php"
 

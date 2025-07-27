@@ -13,7 +13,7 @@ from quasarr.providers.log import info, debug
 supported_mirrors = ["nitroflare", "ddownload"]  # ignoring captcha-protected multiup/mirrorace for now
 
 
-def get_sl_download_links(shared_state, url, mirror, title):
+def get_sl_download_links(shared_state, url, mirror, title): # signature must align with other download link functions!
     headers = {"User-Agent": shared_state.values["user_agent"]}
     session = requests.Session()
 

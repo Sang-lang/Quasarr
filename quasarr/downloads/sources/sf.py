@@ -19,7 +19,7 @@ def is_last_section_integer(url):
     return None
 
 
-def get_sf_download_links(shared_state, url, mirror, title):
+def get_sf_download_links(shared_state, url, mirror, title): # signature must align with other download link functions!
     release_pattern = re.compile(
         r'''
           ^                                   # start of string

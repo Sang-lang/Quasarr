@@ -10,7 +10,7 @@ from bs4 import BeautifulSoup
 from quasarr.providers.log import info, debug
 
 
-def get_mb_download_links(shared_state, url, mirror=None, title=None):
+def get_mb_download_links(shared_state, url, mirror, title): # signature must align with other download link functions!
     headers = {
         'User-Agent': shared_state.values["user_agent"],
     }
@@ -26,7 +26,7 @@ def get_mb_download_links(shared_state, url, mirror=None, title=None):
 
     download_links = []
 
-    pattern = re.compile(r'https?://filecrypt\.[^/]+/Container/', re.IGNORECASE)
+    pattern = re.compile(r'https?://(?:www\.)?filecrypt\.[^/]+/Container/', re.IGNORECASE)
     for a in soup.find_all('a', href=pattern):
         try:
             link = a['href']
