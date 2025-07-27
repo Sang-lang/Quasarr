@@ -279,9 +279,14 @@ def setup_arr_routes(app):
                 elif mode in ['movie', 'tvsearch', 'book', 'search']:
                     releases = []
 
-                    offset = int(getattr(request.query, 'offset', 0))
+                    try:
+                        offset = int(getattr(request.query, 'offset', 0))
+                    except (AttributeError, ValueError):
+                        offset = 0
+
                     if offset > 0:
                         debug(f"Ignoring offset parameter: {offset} - it leads to redundant requests")
+
                     else:
                         if mode == 'movie':
                             # supported params: imdbid

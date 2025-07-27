@@ -307,6 +307,8 @@ def setup_captcha_routes(app):
                         session = decrypted.get("session")
                         mirror = decrypted.get("mirror", "filecrypt")
 
+                        links = [replace_url]
+
                         blob = json.dumps(
                             {
                                 "title": title,
