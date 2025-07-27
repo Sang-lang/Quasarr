@@ -447,7 +447,10 @@ def setup_captcha_routes(app):
             except Exception as e:
                 info(f"Error while resolving download link: {e}")
         else:
-            info("You did not solve the CAPTCHA correctly. Please try again.")
+            if resp.url.endswith("404.html"):
+                info("Your IP has been blocked by Filecrypt. Please try again later.")
+            else:
+                info("You did not solve the CAPTCHA correctly. Please try again.")
 
         return render_centered_html(f"""
         <!DOCTYPE html>
