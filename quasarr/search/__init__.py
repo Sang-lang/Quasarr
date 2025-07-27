@@ -5,9 +5,10 @@
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from quasarr.providers.log import info
+from quasarr.providers.log import info, debug
 from quasarr.search.sources.al import al_feed, al_search
-from quasarr.search.sources.dd import dd_search
+from quasarr.search.sources.by import by_feed, by_search
+from quasarr.search.sources.dd import dd_search, dd_feed
 from quasarr.search.sources.dt import dt_feed, dt_search
 from quasarr.search.sources.dw import dw_feed, dw_search
 from quasarr.search.sources.fx import fx_feed, fx_search
@@ -24,7 +25,10 @@ def get_search_results(shared_state, request_from, imdb_id="", search_phrase="",
     if imdb_id and not imdb_id.startswith('tt'):
         imdb_id = f'tt{imdb_id}'
 
+    docs_search = "lazylibrarian" in request_from.lower()
+
     al = shared_state.values["config"]("Hostnames").get("al")
+    by = shared_state.values["config"]("Hostnames").get("by")
     dd = shared_state.values["config"]("Hostnames").get("dd")
     dt = shared_state.values["config"]("Hostnames").get("dt")
     dw = shared_state.values["config"]("Hostnames").get("dw")
@@ -38,98 +42,84 @@ def get_search_results(shared_state, request_from, imdb_id="", search_phrase="",
     start_time = time.time()
 
     functions = []
-    if imdb_id:
-        if al:
-            functions.append(lambda: al_search(shared_state, start_time, request_from, imdb_id,
-                                               mirror=mirror,
-                                               season=season, episode=episode))
-        if dd:
-            functions.append(lambda: dd_search(shared_state, start_time, request_from, imdb_id,
-                                               mirror=mirror,
-                                               season=season, episode=episode))
-        if dt:
-            functions.append(lambda: dt_search(shared_state, start_time, request_from, imdb_id,
-                                               mirror=mirror,
-                                               season=season, episode=episode))
-        if dw:
-            functions.append(lambda: dw_search(shared_state, start_time, request_from, imdb_id,
-                                               mirror=mirror,
-                                               season=season, episode=episode))
-        if fx:
-            functions.append(lambda: fx_search(shared_state, start_time, request_from, imdb_id,
-                                               mirror=mirror,
-                                               season=season, episode=episode))
-        if mb:
-            functions.append(lambda: mb_search(shared_state, start_time, request_from, imdb_id,
-                                               mirror=mirror,
-                                               season=season, episode=episode))
 
-        if nx:
-            functions.append(lambda: nx_search(shared_state, start_time, request_from, imdb_id,
-                                               mirror=mirror,
-                                               season=season, episode=episode))
-        if sf:
-            functions.append(lambda: sf_search(shared_state, start_time, request_from, imdb_id,
-                                               mirror=mirror,
-                                               season=season, episode=episode))
-        if sl:
-            functions.append(lambda: sl_search(shared_state, start_time, request_from, imdb_id,
-                                               mirror=mirror,
-                                               season=season, episode=episode))
-        if wd:
-            functions.append(lambda: wd_search(shared_state, start_time, request_from, imdb_id,
-                                               mirror=mirror,
-                                               season=season, episode=episode))
+    # Radarr/Sonarr use imdb_id for searches
+    imdb_map = [
+        (al, al_search),
+        (by, by_search),
+        (dd, dd_search),
+        (dt, dt_search),
+        (dw, dw_search),
+        (fx, fx_search),
+        (mb, mb_search),
+        (nx, nx_search),
+        (sf, sf_search),
+        (sl, sl_search),
+        (wd, wd_search),
+    ]
+
+    # LazyLibrarian uses search_phrase for searches
+    phrase_map = [
+        (by, by_search),
+        (dt, dt_search),
+        (nx, nx_search),
+        (sl, sl_search),
+        (wd, wd_search),
+    ]
+
+    # Feed searches omit imdb_id and search_phrase
+    feed_map = [
+        (al, al_feed),
+        (by, by_feed),
+        (dd, dd_feed),
+        (dt, dt_feed),
+        (dw, dw_feed),
+        (fx, fx_feed),
+        (mb, mb_feed),
+        (nx, nx_feed),
+        (sf, sf_feed),
+        (sl, sl_feed),
+        (wd, wd_feed),
+    ]
+
+    if imdb_id:  # only Radarr/Sonarr are using imdb_id
+        args, kwargs = (
+            (shared_state, start_time, request_from, imdb_id),
+            {'mirror': mirror, 'season': season, 'episode': episode}
+        )
+        for flag, func in imdb_map:
+            if flag:
+                functions.append(lambda f=func, a=args, kw=kwargs: f(*a, **kw))
+
+    elif search_phrase and docs_search:  # only LazyLibrarian is allowed to use search_phrase
+        args, kwargs = (
+            (shared_state, start_time, request_from, search_phrase),
+            {'mirror': mirror, 'season': season, 'episode': episode}
+        )
+        for flag, func in phrase_map:
+            if flag:
+                functions.append(lambda f=func, a=args, kw=kwargs: f(*a, **kw))
+
     elif search_phrase:
-        if dt:
-            functions.append(lambda: dt_search(shared_state, start_time, request_from, search_phrase,
-                                               mirror=mirror,
-                                               season=season, episode=episode))
-        if nx:
-            functions.append(lambda: nx_search(shared_state, start_time, request_from, search_phrase,
-                                               mirror=mirror,
-                                               season=season, episode=episode))
+        debug(
+            f"Search phrase '{search_phrase}' is not supported for {request_from}. Only LazyLibrarian can use search phrases.")
 
-        if sl:
-            functions.append(lambda: sl_search(shared_state, start_time, request_from, search_phrase,
-                                               mirror=mirror,
-                                               season=season, episode=episode))
-        if wd:
-            functions.append(lambda: wd_search(shared_state, start_time, request_from, search_phrase,
-                                               mirror=mirror,
-                                               season=season, episode=episode))
     else:
-        if al:
-            functions.append(lambda: al_feed(shared_state, start_time, request_from, mirror=mirror))
+        args, kwargs = (
+            (shared_state, start_time, request_from),
+            {'mirror': mirror}
+        )
+        for flag, func in feed_map:
+            if flag:
+                functions.append(lambda f=func, a=args, kw=kwargs: f(*a, **kw))
 
-        if dd:
-            functions.append(lambda: dd_search(shared_state, start_time, request_from, mirror=mirror))
+    if imdb_id:
+        stype = f'IMDb-ID "{imdb_id}"'
+    elif search_phrase:
+        stype = f'Search-Phrase "{search_phrase}"'
+    else:
+        stype = "feed search"
 
-        if dt:
-            functions.append(lambda: dt_feed(shared_state, start_time, request_from, mirror=mirror))
-
-        if dw:
-            functions.append(lambda: dw_feed(shared_state, start_time, request_from, mirror=mirror))
-
-        if fx:
-            functions.append(lambda: fx_feed(shared_state, start_time, request_from, mirror=mirror))
-
-        if mb:
-            functions.append(lambda: mb_feed(shared_state, start_time, request_from, mirror=mirror))
-
-        if nx:
-            functions.append(lambda: nx_feed(shared_state, start_time, request_from, mirror=mirror))
-
-        if sf:
-            functions.append(lambda: sf_feed(shared_state, start_time, request_from, mirror=mirror))
-
-        if sl:
-            functions.append(lambda: sl_feed(shared_state, start_time, request_from, mirror=mirror))
-
-        if wd:
-            functions.append(lambda: wd_feed(shared_state, start_time, request_from, mirror=mirror))
-
-    stype = f'IMDb-ID "{imdb_id}"' if imdb_id else "feed search"
     info(f'Starting {len(functions)} search functions for {stype}... This may take some time.')
 
     with ThreadPoolExecutor() as executor:

@@ -33,20 +33,7 @@ def resolve_wd_redirect(url, user_agent):
     return None
 
 
-def get_wd_download_links(
-        shared_state,
-        url,
-        mirror=None,
-        title=None,
-        include_details=False
-):
-    """
-    Fetches the download links from the WD detail page by scraping the
-    'Downloads' card.  Returns either:
-      - a list of [url, hoster] pairs (default), or
-      - if include_details=True, a list of dicts {url, hoster, imdb_id}.
-    Returns False on failure.
-    """
+def get_wd_download_links(shared_state, url, mirror, title):  # signature must align with other download link functions!
     wd = shared_state.values["config"]("Hostnames").get("wd")
     user_agent = shared_state.values["user_agent"]
     headers = {"User-Agent": user_agent}
@@ -110,14 +97,7 @@ def get_wd_download_links(
                     debug(f'Skipping link from "{hoster}" (not the desired mirror "{mirror}")!')
                     continue
 
-                if include_details:
-                    results.append({
-                        "url": resolved,
-                        "hoster": hoster,
-                        "imdb_id": imdb_id,
-                    })
-                else:
-                    results.append([resolved, hoster])
+                results.append([resolved, hoster])
     except Exception:
         info(f"WD site has been updated. Parsing download links for {title} not possible!")
 

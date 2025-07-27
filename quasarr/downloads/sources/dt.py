@@ -8,7 +8,7 @@ from bs4 import BeautifulSoup
 from quasarr.providers.log import info
 
 
-def get_dt_download_links(shared_state, url, mirror, title):
+def get_dt_download_links(shared_state, url, mirror, title): # signature must align with other download link functions!
     headers = {"User-Agent": shared_state.values["user_agent"]}
     session = requests.Session()
 

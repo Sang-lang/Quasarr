@@ -41,7 +41,7 @@ def extract_size(text):
     return {"size": m.group(1), "sizeunit": m.group(2)}
 
 
-def _parse_posts(soup, shared_state, url_base, password, mirror_filter,
+def _parse_posts(soup, shared_state, password, mirror_filter,
                  is_search=False, request_from=None, search_string=None,
                  season=None, episode=None):
     releases = []
@@ -153,7 +153,7 @@ def mb_feed(shared_state, start_time, request_from, mirror=None):
     try:
         html_doc = requests.get(url, headers=headers, timeout=10).content
         soup = BeautifulSoup(html_doc, "html.parser")
-        releases = _parse_posts(soup, shared_state, mb, password, mirror_filter=mirror)
+        releases = _parse_posts(soup, shared_state, password, mirror_filter=mirror)
     except Exception as e:
         info(f"Error loading {hostname.upper()} feed: {e}")
         releases = []
@@ -184,7 +184,7 @@ def mb_search(shared_state, start_time, request_from, search_string, mirror=None
         html_doc = requests.get(url, headers=headers, timeout=10).content
         soup = BeautifulSoup(html_doc, "html.parser")
         releases = _parse_posts(
-            soup, shared_state, mb, password, mirror_filter=mirror,
+            soup, shared_state, password, mirror_filter=mirror,
             is_search=True, request_from=request_from,
             search_string=search_string, season=season, episode=episode
         )

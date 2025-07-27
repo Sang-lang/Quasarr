@@ -7,9 +7,9 @@ import time
 from base64 import urlsafe_b64encode
 from datetime import datetime, timezone
 
-from quasarr.providers.sessions.dd import create_and_persist_session, retrieve_and_validate_session
 from quasarr.providers.imdb_metadata import get_localized_title
 from quasarr.providers.log import info, debug
+from quasarr.providers.sessions.dd import create_and_persist_session, retrieve_and_validate_session
 
 hostname = "dd"
 supported_mirrors = ["ironfiles", "rapidgator", "filefactory"]
@@ -24,6 +24,10 @@ def convert_to_rss_date(unix_timestamp):
 
 def extract_size(size_in_bytes):
     return {"size": size_in_bytes, "sizeunit": "B"}
+
+
+def dd_feed(*args, **kwargs):
+    return dd_search(*args, **kwargs)
 
 
 def dd_search(shared_state, start_time, request_from, search_string="", mirror=None, season=None, episode=None):
@@ -89,10 +93,10 @@ def dd_search(shared_state, start_time, request_from, search_string="", mirror=N
                     title = release.get("release")
 
                     if not shared_state.is_valid_release(title,
-                                                                         request_from,
-                                                                         search_string,
-                                                                         season,
-                                                                         episode):
+                                                         request_from,
+                                                         search_string,
+                                                         season,
+                                                         episode):
                         continue
 
                     imdb_id = release.get("imdbid", None)

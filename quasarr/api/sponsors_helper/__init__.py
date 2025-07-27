@@ -23,19 +23,27 @@ def setup_sponsors_helper_routes(app):
             protected = shared_state.get_db("protected").retrieve_all_titles()
             if not protected:
                 return abort(404, "No encrypted packages found")
-            else:
-                package = protected[0]
-                package_id = package[0]
-                data = json.loads(package[1])
-                title = data["title"]
-                links = data["links"]
-                mirror = None if (mirror := data.get('mirror')) == "None" else mirror
-                password = data["password"]
 
-                fichier = [ln for ln in links if "fichier" in ln[1].lower()]
-                rapid = [ln for ln in links if "rapidgator" in ln[1].lower()]
-                others = [ln for ln in links if "fichier" not in ln[1].lower() and "rapidgator" not in ln[1].lower()]
-                prioritized_links = fichier + rapid + others
+            # Find the first package without a "session" key
+            selected_package = None
+            for package in protected:
+                data = json.loads(package[1])
+                if "session" not in data:
+                    selected_package = (package[0], data)
+                    break
+
+            if not selected_package:
+                return abort(404, "No valid packages without session found")
+
+            package_id, data = selected_package
+            title = data["title"]
+            links = data["links"]
+            mirror = None if (mirror := data.get('mirror')) == "None" else mirror
+            password = data["password"]
+
+            rapid = [ln for ln in links if "rapidgator" in ln[1].lower()]
+            others = [ln for ln in links if "rapidgator" not in ln[1].lower()]
+            prioritized_links = rapid + others
 
             return {
                 "to_decrypt": {
@@ -47,7 +55,8 @@ def setup_sponsors_helper_routes(app):
                     "max_attempts": 3
                 }
             }
-        except:
+        except Exception as e:
+            info(f"Failed in to_decrypt_api: {e}")
             return abort(500, "Failed")
 
     @app.post("/sponsors_helper/api/to_download/")

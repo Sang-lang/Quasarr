@@ -27,6 +27,7 @@ class Config(object):
         ],
         'Hostnames': [
             ("al", "secret", ""),
+            ("by", "secret", ""),
             ("dd", "secret", ""),
             ("dt", "secret", ""),
             ("dw", "secret", ""),

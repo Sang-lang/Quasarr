@@ -279,46 +279,55 @@ def setup_arr_routes(app):
                 elif mode in ['movie', 'tvsearch', 'book', 'search']:
                     releases = []
 
-                    if mode == 'movie':
-                        # supported params: imdbid
-                        imdb_id = getattr(request.query, 'imdbid', '')
-                        releases = get_search_results(shared_state, request_from,
-                                                      imdb_id=imdb_id,
-                                                      mirror=mirror
-                                                      )
+                    try:
+                        offset = int(getattr(request.query, 'offset', 0))
+                    except (AttributeError, ValueError):
+                        offset = 0
 
-                    elif mode == 'tvsearch':
-                        # supported params: imdbid, season, ep
-                        imdb_id = getattr(request.query, 'imdbid', '')
-                        season = getattr(request.query, 'season', None)
-                        episode = getattr(request.query, 'ep', None)
-                        releases = get_search_results(shared_state, request_from,
-                                                      imdb_id=imdb_id,
-                                                      mirror=mirror,
-                                                      season=season,
-                                                      episode=episode
-                                                      )
-                    elif mode == 'book':
-                        info(f"Work in progress for {request_from} - book support is not yet implemented")
-                        author = getattr(request.query, 'author', '')
-                        title = getattr(request.query, 'title', '')
-                        search_phrase = " ".join(filter(None, [author, title]))
-                        releases = get_search_results(shared_state, request_from,
-                                                      search_phrase=search_phrase,
-                                                      mirror=mirror
-                                                      )
+                    if offset > 0:
+                        debug(f"Ignoring offset parameter: {offset} - it leads to redundant requests")
 
-                    elif mode == 'search':
-                        if "lazylibrarian" in request_from.lower():
-                            info(f"Work in progress for {request_from} - lazylibrarian support is not yet implemented")
-                            search_phrase = getattr(request.query, 'q', '')
+                    else:
+                        if mode == 'movie':
+                            # supported params: imdbid
+                            imdb_id = getattr(request.query, 'imdbid', '')
+
+                            releases = get_search_results(shared_state, request_from,
+                                                          imdb_id=imdb_id,
+                                                          mirror=mirror
+                                                          )
+
+                        elif mode == 'tvsearch':
+                            # supported params: imdbid, season, ep
+                            imdb_id = getattr(request.query, 'imdbid', '')
+                            season = getattr(request.query, 'season', None)
+                            episode = getattr(request.query, 'ep', None)
+                            releases = get_search_results(shared_state, request_from,
+                                                          imdb_id=imdb_id,
+                                                          mirror=mirror,
+                                                          season=season,
+                                                          episode=episode
+                                                          )
+                        elif mode == 'book':
+                            author = getattr(request.query, 'author', '')
+                            title = getattr(request.query, 'title', '')
+                            search_phrase = " ".join(filter(None, [author, title]))
                             releases = get_search_results(shared_state, request_from,
                                                           search_phrase=search_phrase,
                                                           mirror=mirror
                                                           )
-                        else:
-                            info(f'Ignoring search request from {request_from} - only imdbid searches are supported')
-                            releases = [{}]  # sonarr expects this but we will not support non-imdbid searches
+
+                        elif mode == 'search':
+                            if "lazylibrarian" in request_from.lower():
+                                search_phrase = getattr(request.query, 'q', '')
+                                releases = get_search_results(shared_state, request_from,
+                                                              search_phrase=search_phrase,
+                                                              mirror=mirror
+                                                              )
+                            else:
+                                info(
+                                    f'Ignoring search request from {request_from} - only imdbid searches are supported')
+                                releases = [{}]  # sonarr expects this but we will not support non-imdbid searches
 
                     items = ""
                     for release in releases:

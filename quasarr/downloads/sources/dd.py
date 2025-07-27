@@ -6,7 +6,7 @@ from quasarr.providers.log import info, debug
 from quasarr.providers.sessions.dd import create_and_persist_session, retrieve_and_validate_session
 
 
-def get_dd_download_links(shared_state, mirror, search_string):
+def get_dd_download_links(shared_state, url, mirror, title): # signature must align with other download link functions!
     dd = shared_state.values["config"]("Hostnames").get("dd")
 
     dd_session = retrieve_and_validate_session(shared_state)
@@ -35,7 +35,7 @@ def get_dd_download_links(shared_state, mirror, search_string):
     try:
         release_list = []
         for page in range(0, 100, 20):
-            url = f'https://{dd}/index/search/keyword/{search_string}/qualities/{','.join(qualities)}/from/{page}/search'
+            url = f'https://{dd}/index/search/keyword/{title}/qualities/{','.join(qualities)}/from/{page}/search'
 
             releases_on_page = dd_session.get(url, headers=headers, timeout=10).json()
             if releases_on_page:
@@ -47,7 +47,7 @@ def get_dd_download_links(shared_state, mirror, search_string):
                     debug(f"Release {release.get('release')} marked as fake. Invalidating DD session...")
                     create_and_persist_session(shared_state)
                     return []
-                elif release.get("release") == search_string:
+                elif release.get("release") == title:
                     filtered_links = []
                     for link in release["links"]:
                         if mirror and mirror not in link["hostname"]:

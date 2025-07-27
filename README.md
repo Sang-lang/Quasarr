@@ -62,7 +62,7 @@ Set up Quasarr as a **Newznab Indexer** and **SABnzbd Download Client**:
 > **Important notice**
 > - This feature is experimental and may not work as expected.
 > - Quasarr cannot help you with metadata issues, missing covers, or other LazyLibrarian problems.
-> - Please report issues when one of your hostname yields results through their website, but not in LazyLibrarian.
+> - Please report issues when one of your hostnames yields results through their website, but not in LazyLibrarian.
 
 Set up Quasarr as a **SABnzbd+ Downloader**
 

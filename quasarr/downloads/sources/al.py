@@ -528,7 +528,7 @@ def extract_episode(title: str) -> int | None:
     return None
 
 
-def get_al_download_links(shared_state, url, mirror, title, release_id):
+def get_al_download_links(shared_state, url, mirror, title, release_id): # signature cant align with other download link functions!
     al = shared_state.values["config"]("Hostnames").get(hostname)
 
     sess = retrieve_and_validate_session(shared_state)

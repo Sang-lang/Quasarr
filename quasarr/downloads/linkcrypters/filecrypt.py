@@ -14,7 +14,7 @@ import requests
 from Cryptodome.Cipher import AES
 from bs4 import BeautifulSoup
 
-from quasarr.providers.log import info
+from quasarr.providers.log import info, debug
 
 
 class CNL:
@@ -282,16 +282,62 @@ def get_filecrypt_links(shared_state, token, title, url, password=None, mirror=N
                             ]
                 links.extend(CNL(crypted_data).decrypt())
             except:
-                info("Click'n'Load not found! Falling back to DLC...")
-                crypted_payload = soup.find("button", {"class": "dlcdownload"}).get("onclick")
-                crypted_data = re.findall(r"'(.*?)'", crypted_payload)
-                dlc_secret = crypted_data[0]
-                domain = urlparse(url).netloc
-                if episode and season:
-                    dlc_link = f"https://{domain}/DLC/{dlc_secret}.dlc?{episode}&{season}"
-                else:
-                    dlc_link = f"https://{domain}/DLC/{dlc_secret}.dlc"
-                dlc_file = session.get(dlc_link, headers=headers).content
-                links.extend(DLC(shared_state, dlc_file).decrypt())
+                if "The owner of this folder has deactivated all hosts in this container in their settings." in soup.text:
+                    info(f"Mirror deactivated by the owner: {mirror}")
+                    continue
 
-    return links
+                info("Click'n'Load not found! Falling back to DLC...")
+                try:
+                    crypted_payload = soup.find("button", {"class": "dlcdownload"}).get("onclick")
+                    crypted_data = re.findall(r"'(.*?)'", crypted_payload)
+                    dlc_secret = crypted_data[0]
+                    domain = urlparse(url).netloc
+                    if episode and season:
+                        dlc_link = f"https://{domain}/DLC/{dlc_secret}.dlc?{episode}&{season}"
+                    else:
+                        dlc_link = f"https://{domain}/DLC/{dlc_secret}.dlc"
+                    dlc_file = session.get(dlc_link, headers=headers).content
+                    links.extend(DLC(shared_state, dlc_file).decrypt())
+                except:
+                    info("DLC not found! Falling back to first available download Button...")
+
+                    base_url = urlparse(url).netloc
+                    phpsessid = session.cookies.get('PHPSESSID')
+                    if not phpsessid:
+                        info("PHPSESSID cookie not found! Cannot proceed with download links extraction.")
+                        return False
+
+                    results = []
+
+                    for button in soup.find_all('button'):
+                        # Find the correct data-* attribute (only one expected)
+                        data_attrs = [v for k, v in button.attrs.items() if k.startswith('data-') and k != 'data-i18n']
+                        if not data_attrs:
+                            continue
+
+                        link_id = data_attrs[0]
+                        row = button.find_parent('tr')
+                        mirror_tag = row.find('a', class_='external_link') if row else None
+                        mirror_name = mirror_tag.get_text(strip=True) if mirror_tag else 'unknown'
+                        full_url = f"https://{base_url}/Link/{link_id}.html"
+                        results.append((full_url, mirror_name))
+
+                    sorted_results = sorted(results, key=lambda x: 0 if 'rapidgator' in x[1].lower() else 1)
+
+                    for result_url, mirror in sorted_results:
+                        debug(f"Session {phpsessid} for {result_url} will not live long. Submit new CAPTCHA quickly!")
+                        return {
+                            "status": "replaced",
+                            "replace_url": result_url,
+                            "mirror": mirror,
+                            "session": phpsessid
+                        }
+
+    if not links:
+        info("No links found in Filecrypt response!")
+        return False
+
+    return {
+        "status": "success",
+        "links": links
+    }
