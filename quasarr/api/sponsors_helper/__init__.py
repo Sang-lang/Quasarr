@@ -56,8 +56,7 @@ def setup_sponsors_helper_routes(app):
                 }
             }
         except Exception as e:
-            info(f"Failed in to_decrypt_api: {e}")
-            return abort(500, "Failed")
+            return abort(500, str(e))
 
     @app.post("/sponsors_helper/api/to_download/")
     def to_download_api():
