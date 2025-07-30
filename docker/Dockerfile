@@ -20,6 +20,10 @@ RUN mkdir -p ~/.config/pip && echo -e "[global]\nbreak-system-packages = true" >
   && pip3 install --upgrade pip \
   && pip3 install wheel
 
+# Create a dummy opencv-python package so pip thinks it's satisfied and keeps py3-opencv instead of building it from source
+RUN mkdir -p /tmp/opencv-python && \
+    echo -e "from setuptools import setup\nsetup(name='opencv-python', version='999.0.0')" > /tmp/opencv-python/setup.py && \
+    pip3 install /tmp/opencv-python --no-cache-dir
 
 # Install specified package version and clean up unneeded packages
 RUN if [[ ${VS} == "false" ]] ; then echo "Grabbing latest version from pypi.org" && VERSION=$(curl -Ls https://pypi.org/pypi/${PACKAGE_NAME}/json | jq -r .info.version) ; else echo "Using version from workflow_dispatch input" && VERSION=$VS ; fi  && \
