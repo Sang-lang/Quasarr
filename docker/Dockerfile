@@ -8,7 +8,8 @@ RUN apk add --no-cache curl \
     build-base \
     jq \
     python3-dev \
-    py3-pip
+    py3-pip \
+    py3-opencv
 
 # Optionally set desired version for the build
 ARG VS="false"
