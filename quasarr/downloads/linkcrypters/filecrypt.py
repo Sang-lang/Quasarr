@@ -6,7 +6,6 @@ import base64
 import json
 import random
 import re
-import time
 import xml.dom.minidom
 from urllib.parse import urlparse
 
@@ -326,53 +325,7 @@ def get_filecrypt_links(shared_state, token, title, url, password=None, mirror=N
                     sorted_results = sorted(results, key=lambda x: 0 if 'rapidgator' in x[1].lower() else 1)
 
                     for result_url, mirror in sorted_results:
-                        i = 3
-                        while i > 0:
-                            i -= 1
-                            solution = solve_circlecaptcha(shared_state, phpsessid)
-                            if not solution:
-                                time.sleep(3)
-                            else:
-                                x, y = solution
-
-                                cookies = {'PHPSESSID': phpsessid}
-
-                                headers = {
-                                    'User-Agent': shared_state.values["user_agent"],
-                                }
-
-                                data = {
-                                    "buttonx.x": x,
-                                    "buttonx.y": y,
-                                }
-
-                                response = requests.post(result_url, cookies=cookies, headers=headers, data=data)
-
-                                if response.url.endswith("404.html"):
-                                    info("Your IP has been blocked by Filecrypt. Please try again later.")
-                                    return False
-
-                                match = re.search(r"top\.location\.href\s*=\s*['\"]([^'\"]+)['\"]", response.text)
-                                if match:
-                                    solution = match.group(1)
-                                    info(f"Redirect URL: {solution}")
-                                    redirect_resp = requests.get(solution,
-                                                                 headers=headers,
-                                                                 cookies=cookies,
-                                                                 allow_redirects=True,
-                                                                 timeout=10)
-                                    if "expired" in redirect_resp.text.lower():
-                                        debug("Session expired while solving. This should never happen!")
-                                    else:
-                                        download_link = redirect_resp.url
-                                        if redirect_resp.ok:
-                                            info(f"Successfully resolved download link: {download_link}")
-                                            return {
-                                                "status": "success",
-                                                "links": [download_link]
-                                            }
-
-                        info("Failed to solve circlecaptcha after multiple attempts. Your IP is likely banned!")
+                        info("You must solve circlecaptcha separately!")
                         debug(f'Session "{phpsessid}" for {result_url} will not live long. Submit new CAPTCHA quickly!')
                         return {
                             "status": "replaced",
