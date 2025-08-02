@@ -144,6 +144,10 @@ class StatsHelper:
             "manual_decryption_success_rate": (
                 (stats["captcha_decryptions_manual"] / total_manual_attempts * 100)
                 if total_manual_attempts > 0 else 0
+            ),
+            "average_links_per_package": (
+                stats["links_processed"] / stats["packages_downloaded"]
+                if stats["packages_downloaded"] > 0 else 0
             )
         })
 
