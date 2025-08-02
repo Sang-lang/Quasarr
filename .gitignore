@@ -14,4 +14,3 @@ venv
 *.conf
 *.db
 *.ini
-debug*.png
