@@ -4,175 +4,18 @@
 
 import base64
 import json
-import math
-import os
 import random
 import re
 import time
 import xml.dom.minidom
-from io import BytesIO
 from urllib.parse import urlparse
 
-import cv2
 import dukpy
-import numpy as np
 import requests
 from Cryptodome.Cipher import AES
-from PIL import Image
 from bs4 import BeautifulSoup
 
 from quasarr.providers.log import info, debug
-
-
-def solve_circlecaptcha(shared_state, session):
-    captcha_url = "https://filecrypt.cc/captcha/circle.php"
-    debug(f"Solving circlecaptcha from: {captcha_url}, session: {session}")
-
-    headers = {'User-Agent': shared_state.values["user_agent"]}
-    cookies = {'PHPSESSID': session}
-
-    response = requests.get(captcha_url, headers=headers, cookies=cookies, verify=False)
-    if response.status_code != 200:
-        info("Failed to load circhecaptcha!")
-        return None
-
-    image = Image.open(BytesIO(response.content))
-    image_array = np.array(image)
-    opencv_image = cv2.cvtColor(image_array, cv2.COLOR_RGB2BGR) if image_array.ndim == 3 else image_array
-    grayscale_image = cv2.cvtColor(opencv_image, cv2.COLOR_BGR2GRAY)
-    height, width = grayscale_image.shape
-
-    edges_low = cv2.Canny(grayscale_image, 30, 100)
-    edges_high = cv2.Canny(grayscale_image, 50, 150)
-    enhanced_grayscale = cv2.equalizeHist(grayscale_image)
-    edges_enhanced = cv2.Canny(enhanced_grayscale, 30, 100)
-    combined_edges = cv2.bitwise_or(edges_low, cv2.bitwise_or(edges_high, edges_enhanced))
-
-    def detect_circles(input_image, canny_upper_threshold, accumulator_threshold):
-        return cv2.HoughCircles(
-            input_image, cv2.HOUGH_GRADIENT, dp=1, minDist=10,
-            param1=canny_upper_threshold, param2=accumulator_threshold, minRadius=15, maxRadius=30
-        )
-
-    circles_normal = detect_circles(grayscale_image, 50, 30)
-    circles_enhanced = detect_circles(enhanced_grayscale, 40, 25)
-
-    all_detected_circles = []
-    if circles_normal is not None:
-        all_detected_circles.extend(circles_normal[0])
-    if circles_enhanced is not None:
-        for center_x, center_y, radius in circles_enhanced[0]:
-            if not any(np.hypot(center_x - existing_x, center_y - existing_y) < 10
-                       for existing_x, existing_y, _ in all_detected_circles):
-                all_detected_circles.append((center_x, center_y, radius))
-
-    result_image = opencv_image.copy()
-    circle_analysis_data = []
-
-    if all_detected_circles:
-        num_sample_points = 120
-        sample_angles = np.linspace(0, 2 * np.pi, num_sample_points, endpoint=False)
-
-        def find_gaps(binary_data):
-            data_string = ''.join(map(str, binary_data)) + ''.join(map(str, binary_data[:30]))
-            return [len(match.group()) for match in __import__('re').finditer(r'0+', data_string)
-                    if len(match.group()) <= num_sample_points]
-
-        for (float_center_x, float_center_y, float_radius) in all_detected_circles:
-            center_x, center_y, radius = int(float_center_x), int(float_center_y), int(float_radius)
-            edge_presence = []
-
-            for angle in sample_angles:
-                edge_found = False
-                for radius_offset in range(-3, 4):
-                    check_x = int(center_x + (radius + radius_offset) * np.cos(angle))
-                    check_y = int(center_y + (radius + radius_offset) * np.sin(angle))
-                    if 0 <= check_x < width and 0 <= check_y < height and combined_edges[check_y, check_x] > 0:
-                        edge_found = True
-                        break
-                edge_presence.append(1 if edge_found else 0)
-
-            background_threshold = np.percentile(grayscale_image, 75)
-            intensity_presence = []
-
-            for angle in sample_angles:
-                pixel_x = int(center_x + radius * np.cos(angle))
-                pixel_y = int(center_y + radius * np.sin(angle))
-                if 0 <= pixel_x < width and 0 <= pixel_y < height:
-                    window = grayscale_image[max(0, pixel_y - 2):pixel_y + 3, max(0, pixel_x - 2):pixel_x + 3]
-                    intensity_presence.append(1 if window.size > 0 and window.min() < background_threshold - 20 else 0)
-                else:
-                    intensity_presence.append(0)
-
-            edge_gaps = find_gaps(edge_presence)
-            intensity_gaps = find_gaps(intensity_presence)
-            edge_completeness = sum(edge_presence) / num_sample_points
-            intensity_completeness = sum(intensity_presence) / num_sample_points
-            max_edge_gap = max(edge_gaps) if edge_gaps else 0
-            max_intensity_gap = max(intensity_gaps) if intensity_gaps else 0
-
-            if max_intensity_gap > 0:
-                primary_gap = max_intensity_gap
-                completeness = intensity_completeness
-            else:
-                primary_gap = max_edge_gap
-                completeness = edge_completeness
-
-            gap_angle_degrees = primary_gap / num_sample_points * 360
-
-            circle_analysis_data.append({
-                'center_x': center_x,
-                'center_y': center_y,
-                'radius': radius,
-                'completeness': completeness,
-                'gap_angle_degrees': gap_angle_degrees
-            })
-
-    # Rank and draw circles
-    ranked_circles = sorted(circle_analysis_data, key=lambda circle: circle['gap_angle_degrees'], reverse=True)
-
-    for rank_index, circle in enumerate(ranked_circles, start=1):
-        center_x, center_y = circle['center_x'], circle['center_y']
-        cv2.putText(result_image, str(rank_index), (center_x - 5, center_y + 5),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 255, 0), 1)
-
-    if ranked_circles:
-        most_incomplete_circle = ranked_circles[0]
-        circle_center_x, circle_center_y = most_incomplete_circle['center_x'], most_incomplete_circle['center_y']
-        circle_radius = most_incomplete_circle['radius']
-
-        # Generate random target position within the circle, biased toward center
-        random_angle = random.uniform(0, 2 * math.pi)
-        # Use power of 2 to bias toward center (smaller radii more likely)
-        random_radius_factor = random.random() ** 2
-        # Scale to be closer to center than edge (max 70% of radius)
-        target_radius = circle_radius * random_radius_factor * 0.7
-
-        target_x = int(circle_center_x + target_radius * math.cos(random_angle))
-        target_y = int(circle_center_y + target_radius * math.sin(random_angle))
-
-        cv2.drawMarker(result_image, (target_x, target_y), (0, 0, 255),
-                       markerType=cv2.MARKER_CROSS, markerSize=20, thickness=2)
-        cv2.putText(result_image, "1", (circle_center_x - 5, circle_center_y + 5),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 255, 0), 1)
-
-        debug("Top 3 solution candidates (by gap size):")
-        for rank_index, circle in enumerate(ranked_circles[:3], start=1):
-            debug(f"- #{rank_index} at ({circle['center_x']}, {circle['center_y']}): "
-                  f"gap={circle['gap_angle_degrees']:.0f}°, "
-                  f"complete={circle['completeness'] * 100:.0f}%")
-
-        if os.getenv('DEBUG'):
-            debug("Saving debug image with detected circles and target marker as debug_capcha.png")
-            cv2.imwrite("debug_capcha.png", result_image)
-        debug(f"Total circles detected: {len(circle_analysis_data)}")
-
-        # Return the randomized target coordinates instead of exact center
-        info(f"Found incomplete circle at: x={target_x}, y={target_y}")
-        return target_x, target_y
-    else:
-        info("Could not find any incomplete circles in the image. Unexpected response likely.")
-        return None
 
 
 class CNL:
