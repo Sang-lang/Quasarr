@@ -8,6 +8,7 @@ from typing import List, Dict, Any
 import requests
 
 from quasarr.providers.log import info, debug
+from quasarr.providers.statistics import StatsHelper
 
 
 def unhide_links(shared_state, url):
@@ -41,9 +42,16 @@ def unhide_links(shared_state, url):
             if final_url and final_url not in links:
                 links.append(final_url)
 
+        success = bool(links)
+        if success:
+            StatsHelper(shared_state).increment_captcha_decryptions_automatic()
+        else:
+            StatsHelper(shared_state).increment_failed_decryptions_automatic()
+
         return links
     except Exception as e:
         info(f"Error fetching hide.cx links: {e}")
+        StatsHelper(shared_state).increment_failed_decryptions_automatic()
         return []
 
 

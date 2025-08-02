@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+# Quasarr
+# Project by https://github.com/rix1337
+
 import json
 from collections import defaultdict
 from urllib.parse import urlparse

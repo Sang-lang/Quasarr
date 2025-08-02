@@ -16,6 +16,7 @@ from quasarr.providers import shared_state
 from quasarr.providers.html_templates import render_button, render_centered_html
 from quasarr.providers.log import info, debug
 from quasarr.providers.obfuscated import captcha_js, captcha_values
+from quasarr.providers.statistics import StatsHelper
 
 
 def js_single_quoted_string_safe(text):
@@ -330,6 +331,7 @@ def setup_captcha_routes(app):
                         if downloaded:
                             shared_state.get_db("protected").delete(package_id)
                         else:
+                            links = []
                             raise RuntimeError("Submitting Download to JDownloader failed")
                 else:
                     raise ValueError("No download links found")
@@ -337,7 +339,13 @@ def setup_captcha_routes(app):
         except Exception as e:
             info(f"Error decrypting: {e}")
 
-        return {"success": bool(links), "title": title}
+        success = bool(links)
+        if success:
+            StatsHelper(shared_state).increment_captcha_decryptions_manual()
+        else:
+            StatsHelper(shared_state).increment_failed_decryptions_manual()
+
+        return {"success": success, "title": title}
 
     # The following routes are for circle CAPTCHA
     @app.get('/captcha/circle')
@@ -395,6 +403,7 @@ def setup_captcha_routes(app):
         url = request.query.get('url')
         session = request.query.get('session')
         package_id = request.query.get('package_id')
+        success = False
 
         if not url or not session or not package_id:
             response.status = 400
@@ -438,6 +447,7 @@ def setup_captcha_routes(app):
 
                         downloaded = shared_state.download_package([download_link], title, password, package_id)
                         if downloaded:
+                            success = True
                             shared_state.get_db("protected").delete(package_id)
                         else:
                             raise RuntimeError("Submitting Download to JDownloader failed")
@@ -451,6 +461,11 @@ def setup_captcha_routes(app):
                 info("Your IP has been blocked by Filecrypt. Please try again later.")
             else:
                 info("You did not solve the CAPTCHA correctly. Please try again.")
+
+        if success:
+            StatsHelper(shared_state).increment_captcha_decryptions_manual()
+        else:
+            StatsHelper(shared_state).increment_failed_decryptions_manual()
 
         return render_centered_html(f"""
         <!DOCTYPE html>
