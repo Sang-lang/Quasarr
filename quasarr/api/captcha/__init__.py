@@ -12,6 +12,7 @@ from bottle import request, response, redirect
 
 import quasarr.providers.html_images as images
 from quasarr.downloads.linkcrypters.filecrypt import get_filecrypt_links
+from quasarr.downloads.packages import delete_package
 from quasarr.providers import shared_state
 from quasarr.providers.html_templates import render_button, render_centered_html
 from quasarr.providers.log import info, debug
@@ -96,7 +97,23 @@ def setup_captcha_routes(app):
         except Exception as e:
             return {"error": f"Failed to decode payload: {str(e)}"}
 
-    # The following route are for cutcaptcha
+    @app.get('/captcha/delete/<package_id>')
+    def delete_captcha_package(package_id):
+        success = delete_package(shared_state, package_id)
+        if success:
+            return render_centered_html(f'''<h1><img src="{images.logo}" type="image/png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
+            <p>Package successfully deleted!</p>
+            <p>
+                {render_button("Back", "secondary", {"onclick": "location.href='/captcha'"})}
+            </p>''')
+        else:
+            return render_centered_html(f'''<h1><img src="{images.logo}" type="image/png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
+            <p>Failed to delete package!</p>
+            <p>
+                {render_button("Back", "secondary", {"onclick": "location.href='/captcha'"})}
+            </p>''')
+
+    # The following routes are for cutcaptcha
     @app.get('/captcha/cutcaptcha')
     def serve_cutcaptcha():
         payload = decode_payload()
@@ -118,7 +135,11 @@ def setup_captcha_routes(app):
             # No links found, show an error message
             return render_centered_html(f'''
                 <h1><img src="{images.logo}" type="image/png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
+                <p style="max-width: 370px; word-wrap: break-word; overflow-wrap: break-word;"><b>Package:</b> {title}</p>
                 <p><b>Error:</b> No download links available for this package.</p>
+                <p>
+                    {render_button("Delete Package", "secondary", {"onclick": f"location.href='/captcha/delete/{package_id}'"})}
+                </p>
                 <p>
                     {render_button("Back", "secondary", {"onclick": "location.href='/'"})}
                 </p>
@@ -185,6 +206,7 @@ def setup_captcha_routes(app):
                 ''' + captcha_js() + f'''</script>
                 <div>
                     <h1><img src="{images.logo}" type="image/png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
+                    <p style="max-width: 370px; word-wrap: break-word; overflow-wrap: break-word;"><b>Package:</b> {title}</p>
                     <div id="captcha-key"></div>
                     {link_select}<br><br>
                     <input type="hidden" id="link-hidden" value="{prioritized_links[0][0]}" />
@@ -200,6 +222,9 @@ def setup_captcha_routes(app):
         })}</p>
         </div>
             <br>
+            <p>
+                {render_button("Delete Package", "secondary", {"onclick": f"location.href='/captcha/delete/{package_id}'"})}
+            </p>
             <p>
                 {render_button("Back", "secondary", {"onclick": "location.href='/'"})}
             </p>
@@ -362,6 +387,7 @@ def setup_captcha_routes(app):
 
         package_id = payload.get("package_id")
         session = payload.get("session")
+        title = payload.get("title", "Unknown Package")
         url = payload.get("links")[0] if payload.get("links") else None
 
         if not url or not session or not package_id:
@@ -373,9 +399,13 @@ def setup_captcha_routes(app):
         <html>
           <body>
             <h1><img src="{images.logo}" type="image/png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
+            <p><b>Package:</b> {title}</p>
             <form action="/captcha/decrypt-filecrypt-circle?url={url}&session={session}&&package_id={package_id}" method="post">
               <input type="image" src="/captcha/circle.php?session={session}" name="button" alt="Captcha">
             </form>
+            <p>
+                {render_button("Delete Package", "secondary", {"onclick": f"location.href='/captcha/delete/{package_id}'"})}
+            </p>
             <p>
                 {render_button("Back", "secondary", {"onclick": "location.href='/'"})}
             </p>
