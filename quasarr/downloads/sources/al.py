@@ -15,6 +15,7 @@ from quasarr.downloads.linkcrypters.al import decrypt_content, solve_captcha
 from quasarr.providers.log import info, debug
 from quasarr.providers.sessions.al import retrieve_and_validate_session, invalidate_session, unwrap_flaresolverr_body, \
     fetch_via_flaresolverr, fetch_via_requests_session
+from quasarr.providers.statistics import StatsHelper
 
 hostname = "al"
 
@@ -111,7 +112,7 @@ def find_season_in_release_notes(soup):
             continue
 
         header = th.get_text(strip=True)
-        if 'release ' not in header.lower(): # release notes or release anmerkungen
+        if 'release ' not in header.lower():  # release notes or release anmerkungen
             continue
 
         td = tr.find('td')
@@ -528,7 +529,8 @@ def extract_episode(title: str) -> int | None:
     return None
 
 
-def get_al_download_links(shared_state, url, mirror, title, release_id): # signature cant align with other download link functions!
+def get_al_download_links(shared_state, url, mirror, title,
+                          release_id):  # signature cant align with other download link functions!
     al = shared_state.values["config"]("Hostnames").get(hostname)
 
     sess = retrieve_and_validate_session(shared_state)
@@ -578,6 +580,7 @@ def get_al_download_links(shared_state, url, mirror, title, release_id): # signa
         status = result.get("status_code")
         if not status == 200:
             info(f"FlareSolverr returned HTTP {status} for captcha request")
+            StatsHelper(shared_state).increment_failed_decryptions_automatic()
             return {}
         else:
             text = result.get("text", "")
@@ -585,6 +588,7 @@ def get_al_download_links(shared_state, url, mirror, title, release_id): # signa
                 response_json = result["json"]
             except ValueError:
                 info(f"Unexpected response when initiating captcha: {text}")
+                StatsHelper(shared_state).increment_failed_decryptions_automatic()
                 return {}
 
             code = response_json.get("code", "")
@@ -640,6 +644,7 @@ def get_al_download_links(shared_state, url, mirror, title, release_id): # signa
                                     break
                                 else:
                                     info(f"CAPTCHA was solved, but no links are available for the selection!")
+                                    StatsHelper(shared_state).increment_failed_decryptions_automatic()
                                     return {}
                             elif message == "cnl_login":
                                 info('Login expired, re-creating session...')
@@ -667,6 +672,7 @@ def get_al_download_links(shared_state, url, mirror, title, release_id): # signa
                     f"Code: {code}, Message: {message}"
                 )
                 invalidate_session(shared_state)
+                StatsHelper(shared_state).increment_failed_decryptions_automatic()
                 return {}
 
             try:
@@ -677,6 +683,12 @@ def get_al_download_links(shared_state, url, mirror, title, release_id): # signa
     except Exception as e:
         info(f"Error loading AL download: {e}")
         invalidate_session(shared_state)
+
+    success = bool(links)
+    if success:
+        StatsHelper(shared_state).increment_captcha_decryptions_automatic()
+    else:
+        StatsHelper(shared_state).increment_failed_decryptions_automatic()
 
     return {
         "links": links,

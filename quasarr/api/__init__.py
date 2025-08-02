@@ -9,6 +9,7 @@ from quasarr.api.arr import setup_arr_routes
 from quasarr.api.captcha import setup_captcha_routes
 from quasarr.api.config import setup_config
 from quasarr.api.sponsors_helper import setup_sponsors_helper_routes
+from quasarr.api.statistics import setup_statistics
 from quasarr.providers import shared_state
 from quasarr.providers.html_templates import render_button, render_centered_html
 from quasarr.providers.web_server import Server
@@ -23,6 +24,7 @@ def get_api(shared_state_dict, shared_state_lock):
     setup_arr_routes(app)
     setup_captcha_routes(app)
     setup_config(app, shared_state)
+    setup_statistics(app, shared_state)
     setup_sponsors_helper_routes(app)
 
     @app.get('/')
@@ -110,6 +112,11 @@ def get_api(shared_state_dict, shared_state_lock):
             setTimeout(() => {{ copyBtn.innerText = 'Copy'; }}, 2000);
           }};
         </script>
+        
+        <h3>Statistics</h3>
+        <div class="api-key-wrapper">
+          <button class="btn-primary small" onclick="location.href='/statistics'">View Statistics</button>
+        </div>
         
         <h3>Hostnames</h3>
         <div class="api-key-wrapper">

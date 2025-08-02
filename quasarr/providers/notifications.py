@@ -36,7 +36,7 @@ def send_discord_message(shared_state, title, case, imdb_id=None, details=None, 
 
     poster_object = None
     if case == "unprotected" or case == "captcha":
-        if not imdb_id:
+        if not imdb_id and " " not in title:  # this should prevent imdb_search for ebooks and magazines
             imdb_id = get_imdb_id_from_title(shared_state, title)
         if imdb_id:
             poster_link = get_poster_link(shared_state, imdb_id)

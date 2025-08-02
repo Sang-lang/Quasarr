@@ -10,6 +10,7 @@ from quasarr.downloads import fail
 from quasarr.providers import shared_state
 from quasarr.providers.log import info
 from quasarr.providers.notifications import send_discord_message
+from quasarr.providers.statistics import StatsHelper
 
 
 def setup_sponsors_helper_routes(app):
@@ -72,6 +73,7 @@ def setup_sponsors_helper_routes(app):
             if download_links:
                 downloaded = shared_state.download_package(download_links, title, password, package_id)
                 if downloaded:
+                    StatsHelper(shared_state).increment_captcha_decryptions_automatic()
                     shared_state.get_db("protected").delete(package_id)
                     send_discord_message(shared_state, title=title, case="solved")
                     info(f"Download successfully started for {title}")
@@ -82,6 +84,7 @@ def setup_sponsors_helper_routes(app):
         except Exception as e:
             info(f"Error decrypting: {e}")
 
+        StatsHelper(shared_state).increment_failed_decryptions_automatic()
         return abort(500, "Failed")  #
 
     @app.post("/sponsors_helper/api/to_replace/")
@@ -116,15 +119,20 @@ def setup_sponsors_helper_routes(app):
 
             info(f"Another CAPTCHA solution is required for {mirror} link: {replace_url}")
 
+            StatsHelper(shared_state).increment_captcha_decryptions_automatic()
+
             return f"Replacement link stored for {name}"
 
         except Exception as e:
+            StatsHelper(shared_state).increment_failed_decryptions_automatic()
             info(f"Error handling replacement: {e}")
             return {"error": str(e)}, 500
 
     @app.delete("/sponsors_helper/api/to_failed/")
     def move_to_failed_api():
         try:
+            StatsHelper(shared_state).increment_failed_decryptions_automatic()
+
             data = request.json
             package_id = data.get('package_id')
 

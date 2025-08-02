@@ -20,6 +20,7 @@ from quasarr.downloads.sources.sl import get_sl_download_links
 from quasarr.downloads.sources.wd import get_wd_download_links
 from quasarr.providers.log import info
 from quasarr.providers.notifications import send_discord_message
+from quasarr.providers.statistics import StatsHelper
 
 
 def handle_unprotected(shared_state, title, password, package_id, imdb_id, url,
@@ -40,6 +41,7 @@ def handle_unprotected(shared_state, title, password, package_id, imdb_id, url,
              reason=f'Offline / no links found for "{title}" on {label} - "{url}"')
         return {"success": False, "title": title}
 
+    StatsHelper(shared_state).increment_package_with_links(links)
     return {"success": True, "title": title}
 
 
@@ -189,12 +191,14 @@ def download(shared_state, request_from, title, url, mirror, size_mb, password, 
         )}
 
     info(f'Could not parse URL for "{title}" - "{url}"')
+    StatsHelper(shared_state).increment_failed_downloads()
     return {"success": False, "package_id": package_id, "title": title}
 
 
 def fail(title, package_id, shared_state, reason="Offline / no links found"):
     try:
         info(f"Reason for failure: {reason}")
+        StatsHelper(shared_state).increment_failed_downloads()
         blob = json.dumps({"title": title, "error": reason})
         stored = shared_state.get_db("failed").store(package_id, json.dumps(blob))
         if stored:
