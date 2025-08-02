@@ -82,10 +82,47 @@ def setup_sponsors_helper_routes(app):
         except Exception as e:
             info(f"Error decrypting: {e}")
 
-        return abort(500, "Failed")
+        return abort(500, "Failed")  #
+
+    @app.post("/sponsors_helper/api/to_replace/")
+    def to_replace_api():
+        try:
+            data = request.json
+            name = data.get('name')
+            package_id = data.get('package_id')
+            password = data.get('password')
+            replace_url = data.get('replace_url')
+            mirror = data.get('mirror')
+            session = data.get('session')
+
+            if not all([name, package_id, replace_url, mirror, session]):
+                info("Missing required replacement data")
+                return {"error": "Missing required replacement data"}, 400
+
+            if password is None:
+                password = ""
+
+            blob = json.dumps(
+                {
+                    "title": name,
+                    "links": [replace_url, mirror],
+                    "size_mb": 0,
+                    "password": password,
+                    "mirror": mirror,
+                    "session": session
+                })
+
+            shared_state.get_db("protected").update_store(package_id, blob)
+
+            info(f"Another CAPTCHA solution is required for {mirror} link: {replace_url}")
+
+            return f"Replacement link stored for {name}"
+
+        except Exception as e:
+            info(f"Error handling replacement: {e}")
+            return {"error": str(e)}, 500
 
     @app.delete("/sponsors_helper/api/to_failed/")
-    @app.delete("/sponsors_helper/api/to_delete/")
     def move_to_failed_api():
         try:
             data = request.json
