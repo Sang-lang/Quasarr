@@ -329,6 +329,7 @@ def setup_captcha_routes(app):
                             raise ValueError("No download links found after decryption")
                         downloaded = shared_state.download_package(links, title, password, package_id)
                         if downloaded:
+                            StatsHelper(shared_state).increment_package_with_links(links)
                             shared_state.get_db("protected").delete(package_id)
                         else:
                             links = []
@@ -444,9 +445,10 @@ def setup_captcha_routes(app):
                         data = json.loads(raw_data)
                         title = data.get("title")
                         password = data.get("password", "")
-
-                        downloaded = shared_state.download_package([download_link], title, password, package_id)
+                        links = [download_link]
+                        downloaded = shared_state.download_package(links, title, password, package_id)
                         if downloaded:
+                            StatsHelper(shared_state).increment_package_with_links(links)
                             success = True
                             shared_state.get_db("protected").delete(package_id)
                         else:

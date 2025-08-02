@@ -73,6 +73,7 @@ def setup_sponsors_helper_routes(app):
             if download_links:
                 downloaded = shared_state.download_package(download_links, title, password, package_id)
                 if downloaded:
+                    StatsHelper(shared_state).increment_package_with_links(download_links)
                     StatsHelper(shared_state).increment_captcha_decryptions_automatic()
                     shared_state.get_db("protected").delete(package_id)
                     send_discord_message(shared_state, title=title, case="solved")
