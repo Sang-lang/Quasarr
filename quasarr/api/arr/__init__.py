@@ -333,7 +333,10 @@ def setup_arr_routes(app):
                     for release in releases:
                         release = release.get("details", {})
 
+                        # Ensure clean XML output
                         title = sax_utils.escape(release.get("title", ""))
+                        source = sax_utils.escape(release.get("source", ""))
+
                         if not "lazylibrarian" in request_from.lower():
                             title = f'[{release.get("hostname", "").upper()}] {title}'
 
@@ -342,7 +345,7 @@ def setup_arr_routes(app):
                             <title>{title}</title>
                             <guid isPermaLink="True">{release.get("link", "")}</guid>
                             <link>{release.get("link", "")}</link>
-                            <comments>{release.get("source", "")}</comments>
+                            <comments>{source}</comments>
                             <pubDate>{release.get("date", datetime.now().strftime("%a, %d %b %Y %H:%M:%S +0000"))}</pubDate>
                             <enclosure url="{release.get("link", "")}" length="{release.get("size", 0)}" type="application/x-nzb" />
                         </item>'''
