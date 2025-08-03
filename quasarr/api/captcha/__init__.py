@@ -100,17 +100,35 @@ def setup_captcha_routes(app):
     @app.get('/captcha/delete/<package_id>')
     def delete_captcha_package(package_id):
         success = delete_package(shared_state, package_id)
+
+        # Check if there are more CAPTCHAs to solve after deletion
+        remaining_protected = shared_state.get_db("protected").retrieve_all_titles()
+        has_more_captchas = bool(remaining_protected)
+
+        if has_more_captchas:
+            solve_button = render_button("Solve another CAPTCHA", "primary", {
+                "onclick": "location.href='/captcha'",
+            })
+        else:
+            solve_button = "<b>No more CAPTCHAs</b>"
+
         if success:
             return render_centered_html(f'''<h1><img src="{images.logo}" type="image/png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
             <p>Package successfully deleted!</p>
             <p>
-                {render_button("Back", "secondary", {"onclick": "location.href='/captcha'"})}
+                {solve_button}
+            </p>
+            <p>
+                {render_button("Back", "secondary", {"onclick": "location.href='/'"})}
             </p>''')
         else:
             return render_centered_html(f'''<h1><img src="{images.logo}" type="image/png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
             <p>Failed to delete package!</p>
             <p>
-                {render_button("Back", "secondary", {"onclick": "location.href='/captcha'"})}
+                {solve_button}
+            </p>
+            <p>
+                {render_button("Back", "secondary", {"onclick": "location.href='/'"})}
             </p>''')
 
     # The following routes are for cutcaptcha
@@ -166,13 +184,27 @@ def setup_captcha_routes(app):
         else:
             link_select = f'<div id="mirrors-select">Mirror: <b>{prioritized_links[0][1]}</b></div>'
 
+        # Pre-render button HTML in Python
+        solve_another_html = render_button("Solve another CAPTCHA", "primary", {"onclick": "location.href='/captcha'"})
+        back_button_html = render_button("Back", "secondary", {"onclick": "location.href='/'"})
+
         content = render_centered_html(r'''
             <script type="text/javascript">
                 var api_key = "''' + captcha_values()["api_key"] + r'''";
                 var endpoint = '/' + window.location.pathname.split('/')[1] + '/' + api_key + '.html';
+                var solveAnotherHtml = `<p>''' + solve_another_html + r'''</p><p>''' + back_button_html + r'''</p>`;
+                var noMoreHtml = `<p><b>No more CAPTCHAs</b></p><p>''' + back_button_html + r'''</p>`;
+
                 function handleToken(token) {
                     document.getElementById("puzzle-captcha").remove();
                     document.getElementById("mirrors-select").remove();
+                    document.getElementById("delete-package-section").style.display = "none";
+                    document.getElementById("back-button-section").style.display = "none";
+
+                    // Remove width limit on result screen
+                    var packageTitle = document.getElementById("package-title");
+                    packageTitle.style.maxWidth = "none";
+
                     document.getElementById("captcha-key").innerText = 'Using result "' + token + '" to decrypt links...';
                     var link = document.getElementById("link-hidden").value;
                     const fullPath = '/captcha/decrypt-filecrypt';
@@ -195,18 +227,26 @@ def setup_captcha_routes(app):
                     .then(data => {
                         if (data.success) {
                             document.getElementById("captcha-key").insertAdjacentHTML('afterend', 
-                                '<p>Successful for: ' + data.title + '</p>');
+                                '<p>Successful!</p>');
                         } else {
                             document.getElementById("captcha-key").insertAdjacentHTML('afterend', 
                                 '<p>Failed. Check console for details!</p>');
                         }
-                        document.getElementById("reload-button").style.display = "block";
+
+                        // Show appropriate button based on whether more CAPTCHAs exist
+                        var reloadSection = document.getElementById("reload-button");
+                        if (data.has_more_captchas) {
+                            reloadSection.innerHTML = solveAnotherHtml;
+                        } else {
+                            reloadSection.innerHTML = noMoreHtml;
+                        }
+                        reloadSection.style.display = "block";
                     });
                 }
                 ''' + captcha_js() + f'''</script>
                 <div>
                     <h1><img src="{images.logo}" type="image/png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
-                    <p style="max-width: 370px; word-wrap: break-word; overflow-wrap: break-word;"><b>Package:</b> {title}</p>
+                    <p id="package-title" style="max-width: 370px; word-wrap: break-word; overflow-wrap: break-word;"><b>Package:</b> {title}</p>
                     <div id="captcha-key"></div>
                     {link_select}<br><br>
                     <input type="hidden" id="link-hidden" value="{prioritized_links[0][0]}" />
@@ -216,18 +256,18 @@ def setup_captcha_routes(app):
                         </div>
                     </div>
                     <div id="reload-button" style="display: none;">
-                    <p>
-                    {render_button("Solve another CAPTCHA", "secondary", {
-            "onclick": "location.href='/captcha'",
-        })}</p>
-        </div>
+                    </div>
             <br>
+            <div id="delete-package-section">
             <p>
                 {render_button("Delete Package", "secondary", {"onclick": f"location.href='/captcha/delete/{package_id}'"})}
             </p>
+            </div>
+            <div id="back-button-section">
             <p>
                 {render_button("Back", "secondary", {"onclick": "location.href='/'"})}
             </p>
+            </div>
                 </div>
                 </html>''')
 
@@ -371,7 +411,11 @@ def setup_captcha_routes(app):
         else:
             StatsHelper(shared_state).increment_failed_decryptions_manual()
 
-        return {"success": success, "title": title}
+        # Check if there are more CAPTCHAs to solve
+        remaining_protected = shared_state.get_db("protected").retrieve_all_titles()
+        has_more_captchas = bool(remaining_protected)
+
+        return {"success": success, "title": title, "has_more_captchas": has_more_captchas}
 
     # The following routes are for circle CAPTCHA
     @app.get('/captcha/circle')
@@ -468,7 +512,7 @@ def setup_captcha_routes(app):
                 else:
                     download_link = redirect_resp.url
                     if redirect_resp.ok:
-                        solution = f"Successfully resolved download link: {download_link}"
+                        solution = f"Successfully resolved download link!"
                         info(solution)
 
                         raw_data = shared_state.get_db("protected").retrieve(package_id)
@@ -499,6 +543,17 @@ def setup_captcha_routes(app):
         else:
             StatsHelper(shared_state).increment_failed_decryptions_manual()
 
+        # Check if there are more CAPTCHAs to solve
+        remaining_protected = shared_state.get_db("protected").retrieve_all_titles()
+        has_more_captchas = bool(remaining_protected)
+
+        if has_more_captchas:
+            solve_button = render_button("Solve another CAPTCHA", "primary", {
+                "onclick": "location.href='/captcha'",
+            })
+        else:
+            solve_button = "<b>No more CAPTCHAs</b>"
+
         return render_centered_html(f"""
         <!DOCTYPE html>
         <html>
@@ -506,9 +561,7 @@ def setup_captcha_routes(app):
             <h1><img src="{images.logo}" type="image/png" alt="Quasarr logo" class="logo"/>Quasarr</h1>
             <p>{solution}</p>
             <p>
-                {render_button("Solve another CAPTCHA", "secondary", {
-            "onclick": "location.href='/captcha'",
-        })}
+                {solve_button}
             </p>
             <p>
                 {render_button("Back", "secondary", {"onclick": "location.href='/'"})}

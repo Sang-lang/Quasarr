@@ -8,7 +8,7 @@ from quasarr.storage.setup import hostname_form_html, save_hostnames
 
 
 def setup_config(app, shared_state):
-    @app.get('/hostnames/')
+    @app.get('/hostnames')
     def hostnames_ui():
         message = """<p>
             At least one hostname must be kept.
@@ -16,7 +16,7 @@ def setup_config(app, shared_state):
         back_button = f'''<p>
                         {render_button("Back", "secondary", {"onclick": "location.href='/'"})}
                     </p>'''
-        return render_form("Update your Hostnames", hostname_form_html(shared_state, message) + back_button)
+        return render_form("Hostnames", hostname_form_html(shared_state, message) + back_button)
 
     @app.post("/api/hostnames")
     def hostnames_api():
