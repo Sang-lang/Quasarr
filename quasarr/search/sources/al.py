@@ -26,29 +26,81 @@ def convert_to_rss_date(date_str: str) -> str:
     return parsed.strftime("%a, %d %b %Y %H:%M:%S +0000")
 
 
+import re
+from datetime import datetime, timedelta
+
+
+def convert_to_rss_date(date_str: str) -> str:
+    # First try to parse relative dates (German and English)
+    parsed_date = parse_relative_date(date_str)
+    if parsed_date:
+        return parsed_date.strftime("%a, %d %b %Y %H:%M:%S +0000")
+
+    # Fall back to absolute date parsing
+    try:
+        parsed = datetime.strptime(date_str, "%d.%m.%Y - %H:%M")
+        return parsed.strftime("%a, %d %b %Y %H:%M:%S +0000")
+    except ValueError:
+        # If parsing fails, return the original string or handle as needed
+        raise ValueError(f"Could not parse date: {date_str}")
+
+
 def parse_relative_date(raw: str) -> datetime | None:
-    m = re.match(r"vor\s+(\d+)\s+(\w+)", raw)
-    if not m:
-        return None
-    num = int(m.group(1))
-    unit = m.group(2).lower()
-    if unit.startswith("sekunde"):
-        delta = timedelta(seconds=num)
-    elif unit.startswith("minute"):
-        delta = timedelta(minutes=num)
-    elif unit.startswith("stunde"):
-        delta = timedelta(hours=num)
-    elif unit.startswith("tag"):
-        delta = timedelta(days=num)
-    elif unit.startswith("woche"):
-        delta = timedelta(weeks=num)
-    elif unit.startswith("monat"):
-        delta = timedelta(days=30 * num)
-    elif unit.startswith("jahr"):
-        delta = timedelta(days=365 * num)
-    else:
-        return None
-    return datetime.utcnow() - delta
+    # German pattern: "vor X Einheit(en)"
+    german_match = re.match(r"vor\s+(\d+)\s+(\w+)", raw, re.IGNORECASE)
+    if german_match:
+        num = int(german_match.group(1))
+        unit = german_match.group(2).lower()
+
+        if unit.startswith("sekunde"):
+            delta = timedelta(seconds=num)
+        elif unit.startswith("minute"):
+            delta = timedelta(minutes=num)
+        elif unit.startswith("stunde"):
+            delta = timedelta(hours=num)
+        elif unit.startswith("tag"):
+            delta = timedelta(days=num)
+        elif unit.startswith("woche"):
+            delta = timedelta(weeks=num)
+        elif unit.startswith("monat"):
+            delta = timedelta(days=30 * num)
+        elif unit.startswith("jahr"):
+            delta = timedelta(days=365 * num)
+        else:
+            return None
+
+        return datetime.utcnow() - delta
+
+    # English pattern: "X Unit(s) ago"
+    english_match = re.match(r"(\d+)\s+(\w+)\s+ago", raw, re.IGNORECASE)
+    if english_match:
+        num = int(english_match.group(1))
+        unit = english_match.group(2).lower()
+
+        # Remove plural 's' if present
+        if unit.endswith('s'):
+            unit = unit[:-1]
+
+        if unit.startswith("second"):
+            delta = timedelta(seconds=num)
+        elif unit.startswith("minute"):
+            delta = timedelta(minutes=num)
+        elif unit.startswith("hour"):
+            delta = timedelta(hours=num)
+        elif unit.startswith("day"):
+            delta = timedelta(days=num)
+        elif unit.startswith("week"):
+            delta = timedelta(weeks=num)
+        elif unit.startswith("month"):
+            delta = timedelta(days=30 * num)
+        elif unit.startswith("year"):
+            delta = timedelta(days=365 * num)
+        else:
+            return None
+
+        return datetime.utcnow() - delta
+
+    return None
 
 
 def extract_size(text):
