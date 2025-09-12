@@ -34,13 +34,22 @@ def convert_to_rss_date(date_str):
 
 
 def extract_size(text):
-    match = re.match(r"(\d+) ([A-Za-z]+)", text)
+    # First try the normal pattern: number + space + unit (e.g., "1024 MB")
+    match = re.match(r"(\d+)\s+([A-Za-z]+)", text)
     if match:
         size = match.group(1)
         unit = match.group(2)
         return {"size": size, "sizeunit": unit}
-    else:
-        raise ValueError(f"Invalid size format: {text}")
+
+    # If that fails, try pattern with just unit (e.g., "MB")
+    unit_match = re.match(r"([A-Za-z]+)", text.strip())
+    if unit_match:
+        unit = unit_match.group(1)
+        # Fall back to 0 when size is missing
+        return {"size": "0", "sizeunit": unit}
+
+    # If neither pattern matches, raise the original error
+    raise ValueError(f"Invalid size format: {text}")
 
 
 def dw_feed(shared_state, start_time, request_from, mirror=None):
