@@ -340,13 +340,19 @@ def setup_arr_routes(app):
                         if not "lazylibrarian" in request_from.lower():
                             title = f'[{release.get("hostname", "").upper()}] {title}'
 
+                        # CRITICAL FIX: Ensure pubDate is never empty
+                        # Use current time if date is missing or empty
+                        pub_date = release.get("date", "").strip()
+                        if not pub_date:
+                            pub_date = datetime.now().strftime("%a, %d %b %Y %H:%M:%S +0000")
+
                         items += f'''
                         <item>
                             <title>{title}</title>
                             <guid isPermaLink="True">{release.get("link", "")}</guid>
                             <link>{release.get("link", "")}</link>
                             <comments>{source}</comments>
-                            <pubDate>{release.get("date", datetime.now().strftime("%a, %d %b %Y %H:%M:%S +0000"))}</pubDate>
+                            <pubDate>{pub_date}</pubDate>
                             <enclosure url="{release.get("link", "")}" length="{release.get("size", 0)}" type="application/x-nzb" />
                         </item>'''
 
